@@ -134,6 +134,7 @@ class TallyServer(ServerFactory):
             ts_conf = conf['tally_server']
 
             if 'counters' in ts_conf:
+                # TODO: refactor to avoid duplicate code
                 expanded_path = os.path.expanduser(ts_conf['counters'])
                 ts_conf['counters'] = os.path.abspath(expanded_path)
                 assert os.path.exists(os.path.dirname(ts_conf['counters']))
@@ -142,6 +143,19 @@ class TallyServer(ServerFactory):
                 ts_conf['counters'] = counters_conf['counters']
             else:
                 ts_conf['counters'] = conf['counters']
+
+            # Load the sigma values from the data collector configuration
+            # this is a cut-down version of the DC loading script
+            dc_conf = conf['data_collector']
+
+            if 'counters' in dc_conf:
+                # TODO: refactor to avoid duplicate code
+                expanded_path = os.path.expanduser(dc_conf['counters'])
+                dc_conf['counters'] = os.path.abspath(expanded_path)
+                assert os.path.exists(os.path.dirname(dc_conf['counters']))
+                with open(dc_conf['counters'], 'r') as fin:
+                    dc_counters_conf = yaml.load(fin)
+                ts_conf['sigma'] = dc_counters_conf['counters']
 
             # if key path is not specified, look at default path, or generate a new key
             if 'key' in ts_conf and 'cert' in ts_conf:
@@ -175,6 +189,9 @@ class TallyServer(ServerFactory):
             assert ts_conf['collect_period'] > 0
             assert ts_conf['continue'] == True or ts_conf['continue'] == False
             assert ts_conf['q'] > 0
+            # Do we need to sanity check this, or just dump it out?
+            # We shouldn't duplicate the sanity check code both here and in the DC
+            assert ts_conf['sigma'] is not None
 
             for key in ts_conf['counters']:
                 if 'Histogram' in key:
@@ -295,7 +312,11 @@ class TallyServer(ServerFactory):
         for uid in sk_uids:
             sk_public_keys[uid] = self.clients[uid]['public_key']
 
-        self.collection_phase = CollectionPhase(self.config['collect_period'], self.config['counters'], sk_uids, sk_public_keys, dc_uids, self.config['q'], clock_padding)
+        dc_names = {}
+        for uid in dc_uids:
+          dc_names[uid] = self.clients[uid]['name']
+
+        self.collection_phase = CollectionPhase(self.config['collect_period'], self.config['counters'], sk_uids, sk_public_keys, dc_uids, self.config['q'], clock_padding, self.config['sigma'], dc_names)
         self.collection_phase.start()
 
     def stop_collection_phase(self):
@@ -335,7 +356,7 @@ class TallyServer(ServerFactory):
 
 class CollectionPhase(object):
 
-    def __init__(self, period, counters_config, sk_uids, sk_public_keys, dc_uids, param_q, clock_padding):
+    def __init__(self, period, counters_config, sk_uids, sk_public_keys, dc_uids, param_q, clock_padding, sigma_config, dc_names):
         # store configs
         self.period = period
         self.counters_config = counters_config
@@ -344,6 +365,8 @@ class CollectionPhase(object):
         self.dc_uids = dc_uids
         self.param_q = param_q
         self.clock_padding = clock_padding
+        self.sigma_config = sigma_config
+        self.dc_names = dc_names
 
         # setup some state
         self.state = 'new' # states: new -> starting_dcs -> starting_sks -> started -> stopping -> stopped
@@ -515,6 +538,45 @@ class CollectionPhase(object):
         logging.info("sending stop command to {} {} request for counters".format(client_uid, msg))
         return config
 
+    # the context is written out with the tally results
+    def get_result_context(self):
+        result_context = {}
+
+        # log the times used for the round
+        result_time = {}
+        # Do we want to round these times?
+        # (That is, use begin and end instead?)
+        result_time['Start'] = self.starting_ts
+        result_time['Stop'] = self.stopping_ts
+        result_time['Period'] = self.period
+        result_time['ClockPadding'] = self.clock_padding
+        result_context['Time'] = result_time
+
+        # add the values used while counting
+        result_count_context = {}
+        # the bins are listed in each Tally, so we don't duplicate them here
+        #result_count_context['CounterBins'] = self.counters_config
+        result_count_context['Q'] = self.param_q
+        # The TS reads the data collector config to load the sigma values
+        result_count_context['Sigma'] = self.sigma_config
+        result_context['Count'] = result_count_context
+
+        # add the privcount SKs that participated in the count
+        result_sk = {}
+        result_sk['UID'] = self.sk_uids
+        # the keys are large and unnecessary
+        #result_sk['PublicKey'] = self.sk_public_keys
+        result_context['SK'] = result_sk
+
+        # add the privcount DCs that participated in the count
+        result_dc = {}
+        # Each name comes with a UID
+        #result_dc['UID'] = self.dc_uids
+        result_dc['Name'] = self.dc_names
+        result_context['DC'] = result_dc
+
+        return result_context
+
     def write_results(self, path_prefix):
         if not self.is_stopped():
             logging.warning("trying to write results before collection phase is stopped")
@@ -532,12 +594,30 @@ class CollectionPhase(object):
 
         tallied_counts = tallied_counter.detach_counts()
 
+        # For backwards compatibility, write out a "tallies" file
+        # This file only has the counts
         begin, end = int(round(self.starting_ts)), int(round(self.stopping_ts))
         filepath = "{}/privcount.tallies.{}-{}.json".format(path_prefix, begin, end)
         with open(filepath, 'a') as fout:
             json.dump(tallied_counts, fout, sort_keys=True, indent=4)
 
-        logging.info("tally was successful, results for phase from %d to %d were written to file '%s'", begin, end, filepath)
+        #logging.info("tally was successful, counts for phase from %d to %d were written to file '%s'", begin, end, filepath)
+
+        # Write out an "outcome" file that adds context to the counts
+        # This makes it easier to interpret results later on
+        result_info = {}
+
+        # add the existing list of counts as its own item
+        result_info['Tally'] = tallied_counts
+
+        # add the context of the outcome as another item
+        result_info['Context'] = self.get_result_context()
+
+        filepath = "{}/privcount.outcome.{}-{}.json".format(path_prefix, begin, end)
+        with open(filepath, 'a') as fout:
+            json.dump(result_info, fout, sort_keys=True, indent=4)
+
+        logging.info("tally was successful, outcome of phase from %d to %d were written to file '%s'", begin, end, filepath)
         self.final_counts = {}
 
     def log_status(self):
