@@ -157,6 +157,16 @@ class TallyServer(ServerFactory):
                     dc_counters_conf = yaml.load(fin)
                 ts_conf['sigma'] = dc_counters_conf['counters']
 
+            # Also load the tally server's IP and port
+            if 'tally_server_info' in dc_conf:
+                ts_conf['tally_server_info'] = dc_conf['tally_server_info']
+            else:
+                my_info = {}
+                # I think it's better to just leave this out
+                #my_info['ip'] = 'unknown'
+                my_info['port'] = ts_conf['listen_port']
+                ts_conf['tally_server_info'] = my_info
+
             # if key path is not specified, look at default path, or generate a new key
             if 'key' in ts_conf and 'cert' in ts_conf:
                 expanded_path = os.path.expanduser(ts_conf['key'])
@@ -316,7 +326,7 @@ class TallyServer(ServerFactory):
         for uid in dc_uids:
           dc_names[uid] = self.clients[uid]['name']
 
-        self.collection_phase = CollectionPhase(self.config['collect_period'], self.config['counters'], sk_uids, sk_public_keys, dc_uids, self.config['q'], clock_padding, self.config['sigma'], dc_names)
+        self.collection_phase = CollectionPhase(self.config['collect_period'], self.config['counters'], sk_uids, sk_public_keys, dc_uids, self.config['q'], clock_padding, self.config['sigma'], dc_names, self.config['tally_server_info'])
         self.collection_phase.start()
 
     def stop_collection_phase(self):
@@ -356,7 +366,7 @@ class TallyServer(ServerFactory):
 
 class CollectionPhase(object):
 
-    def __init__(self, period, counters_config, sk_uids, sk_public_keys, dc_uids, param_q, clock_padding, sigma_config, dc_names):
+    def __init__(self, period, counters_config, sk_uids, sk_public_keys, dc_uids, param_q, clock_padding, sigma_config, dc_names, tally_server_info):
         # store configs
         self.period = period
         self.counters_config = counters_config
@@ -367,6 +377,7 @@ class CollectionPhase(object):
         self.clock_padding = clock_padding
         self.sigma_config = sigma_config
         self.dc_names = dc_names
+        self.tally_server_info = tally_server_info
 
         # setup some state
         self.state = 'new' # states: new -> starting_dcs -> starting_sks -> started -> stopping -> stopped
@@ -574,6 +585,9 @@ class CollectionPhase(object):
         #result_dc['UID'] = self.dc_uids
         result_dc['Name'] = self.dc_names
         result_context['DC'] = result_dc
+
+        # add the tally server itself
+        result_context['TS'] = self.tally_server_info
 
         return result_context
 
