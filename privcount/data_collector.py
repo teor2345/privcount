@@ -33,7 +33,7 @@ class DataCollector(ReconnectingClientFactory):
         self.config = None
         self.aggregator = None
         self.aggregator_defer_id = None
-        self.fingerprint = None
+        self.context = {}
 
     def buildProtocol(self, addr):
         return PrivCountClientProtocol(self)
@@ -73,11 +73,11 @@ class DataCollector(ReconnectingClientFactory):
     def get_status(self): # called by protocol
         status = {'type':'DataCollector', 'name':self.config['name'],
                   'state': 'active' if self.aggregator is not None else 'idle'}
-        # store the fingerprint so we have it even when the aggregator goes away
-        if self.aggregator is not None and self.fingerprint is None:
-            self.fingerprint = self.aggregator.get_fingerprint()
-        if self.fingerprint is not None:
-            status['fingerprint'] = self.fingerprint
+        # store the latest context, so we have it even when the aggregator goes away
+        if self.aggregator is not None:
+            self.context.update(self.aggregator.get_context())
+        # and include the latest context values in the status
+        status.update(self.context)
         return status
 
     def set_server_status(self, status): # called by protocol
@@ -271,6 +271,11 @@ class Aggregator(ReconnectingClientFactory):
         self.cli_ips_current = {}
         self.cli_ips_previous = {}
 
+        self.nickname = None
+        self.orport = None
+        self.dirport = None
+        self.version = None
+        self.address = None
         self.fingerprint = None
 
     def buildProtocol(self, addr):
@@ -311,6 +316,143 @@ class Aggregator(ReconnectingClientFactory):
     def get_shares(self):
         return self.secure_counters.detach_blinding_shares()
 
+    def set_nickname(self, nickname):
+        nickname = nickname.strip()
+
+        # Do some basic validation of the nickname
+        if len(nickname) < 1 or len(nickname) > 19:
+            logging.warning("Bad nickname length %d: %s", len(nickname), nickname)
+            return False
+        if not all(c in (string.ascii_letters + string.digits) for c in nickname):
+            logging.warning("Bad nickname characters: %s", nickname)
+            return False
+
+        # Are we replacing an existing nickname?
+        if self.nickname is not None:
+            if self.nickname != nickname:
+                logging.warning("Replacing nickname %s with %s", self.nickname, nickname)
+            else:
+                logging.debug("Duplicate nickname received %s", nickname)
+
+        self.nickname = nickname
+
+        return True
+
+    def get_nickname(self):
+        return self.nickname
+
+    def set_orport(self, orport):
+        orport = orport.strip()
+
+        # Do some basic validation of the orport
+        if len(orport) < 1 or len(orport) > 5:
+            logging.warning("Bad orport length %d: %s", len(orport), orport)
+            return False
+        if not all(c in string.digits for c in orport):
+            logging.warning("Bad orport characters: %s", orport)
+            return False
+        orport_n = int(orport)
+        if orport_n < 1 or orport_n > 65535:
+            logging.warning("Bad orport: out of range: %s", orport)
+            return False
+
+        # Are we replacing an existing nickname?
+        if self.orport is not None:
+            if self.orport != orport:
+                logging.warning("Replacing orport %s with %s", self.orport, orport)
+            else:
+                logging.debug("Duplicate orport received %s", orport)
+
+        self.orport = orport
+
+        return True
+
+    def get_orport(self):
+        return self.orport
+
+    def set_dirport(self, dirport):
+        dirport = dirport.strip()
+
+        # Do some basic validation of the dirport
+        if len(dirport) < 1 or len(dirport) > 5:
+            logging.warning("Bad dirport length %d: %s", len(dirport), dirport)
+            return False
+        if not all(c in string.digits for c in dirport):
+            logging.warning("Bad dirport characters: %s", dirport)
+            return False
+        dirport_n = int(dirport)
+        if dirport_n < 1 or dirport_n > 65535:
+            logging.warning("Bad dirport: out of range: %s", dirport)
+            return False
+
+        # Are we replacing an existing nickname?
+        if self.dirport is not None:
+            if self.dirport != dirport:
+                logging.warning("Replacing dirport %s with %s", self.dirport, dirport)
+            else:
+                logging.debug("Duplicate dirport received %s", dirport)
+
+        self.dirport = dirport
+
+        return True
+
+    def get_dirport(self):
+        return self.dirport
+
+    def set_version(self, version):
+        version = version.strip()
+
+        # Do some basic validation of the version
+        # This is hard, because versions can be almost anything
+        if not len(version) > 0:
+            logging.warning("Bad version length %d: %s", len(version), version)
+            return False
+        # This means unicode printables, there's no ASCII equivalent
+        if not all(c in string.printable for c in version):
+            logging.warning("Bad version characters: %s", version)
+            return False
+
+        # Are we replacing an existing version?
+        if self.version is not None:
+            if self.version != version:
+                logging.warning("Replacing version %s with %s", self.version, version)
+            else:
+                logging.debug("Duplicate version received %s", version)
+
+        self.version = version
+
+        return True
+
+    def get_version(self):
+        return self.version
+
+    def set_address(self, address):
+        address = address.strip()
+
+        # Do some basic validation of the address
+        # Relays must all have IPv4 addresses, so just checking for IPv4 is ok
+        if len(address) < 7 or len(address) > 15:
+            logging.warning("Bad address length %d: %s", len(address), address)
+            return False
+        if not all(c in (string.digits + '.') for c in address):
+            logging.warning("Bad address characters: %s", address)
+            return False
+        # We could check each component is between 0 and 255, but that's overkill
+
+        # Are we replacing an existing address?
+        if self.address is not None:
+            if self.address != address:
+                logging.warning("Replacing address %s with %s", self.address, address)
+            else:
+                logging.debug("Duplicate address received %s", address)
+
+        self.address = address
+
+        return True
+
+    def get_address(self):
+        return self.address
+
     def set_fingerprint(self, fingerprint):
         fingerprint = fingerprint.strip()
 
@@ -335,6 +477,23 @@ class Aggregator(ReconnectingClientFactory):
 
     def get_fingerprint(self):
         return self.fingerprint
+
+    # return a dictionary containing each available context item
+    def get_context(self):
+        context = {}
+        if self.get_nickname() is not None:
+            context['nickname'] = self.get_nickname()
+        if self.get_orport() is not None:
+            context['orport'] = self.get_orport()
+        if self.get_dirport() is not None:
+            context['dirport'] = self.get_dirport()
+        if self.get_version() is not None:
+            context['version'] = self.get_version()
+        if self.get_address() is not None:
+            context['address'] = self.get_address()
+        if self.get_fingerprint() is not None:
+            context['fingerprint'] = self.get_fingerprint()
+        return context
 
     def handle_event(self, event):
         if not self.secure_counters:
