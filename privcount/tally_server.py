@@ -329,18 +329,16 @@ class TallyServer(ServerFactory):
         if uid not in self.clients:
             logging.info("new {} {} joined and is {}".format(status['type'], uidfp, status['state']))
 
-        self.clients[uid] = status
+        # for each key, replace the client value with the value from status,
+        # or, if uid is a new client, initialise uid with status
+        self.clients.setdefault(uid, status).update(status)
         if oldstate == self.clients[uid]['state']:
             self.clients[uid]['time'] = oldtime
         else:
             self.clients[uid]['time'] = status['alive']
 
-        # remember the latest fingerprint for next time, in case the client forgets
-        if oldfingerprint is None and fingerprint is not None:
-            self.clients[uid]['fingerprint'] = fingerprint
-
-        minutes = int((time() - status['time'])/ 60.0)
-        logging.info("----client status: {} {} is alive and {} for {} minutes (since {})".format(status['type'], uidfp, status['state'], minutes, status['time']))
+        minutes = int((time() - self.clients[uid]['time'])/ 60.0)
+        logging.info("----client status: {} {} is alive and {} for {} minutes (since {})".format(self.clients[uid]['type'], uidfp, self.clients[uid]['state'], minutes, self.clients[uid]['time']))
 
     def get_clock_padding(self, client_uids):
         max_delay = max([self.clients[uid]['rtt']+self.clients[uid]['clock_skew'] for uid in client_uids])
