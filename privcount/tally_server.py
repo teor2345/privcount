@@ -294,11 +294,40 @@ class TallyServer(ServerFactory):
         return status
 
     def set_client_status(self, uid, status): # called by protocol
+        for k in status.keys():
+            logging.debug("{} sent status: {}: {}".format(uid, k, status[k]))
+        if uid in self.clients:
+            for k in self.clients[uid].keys():
+                logging.debug("{} has stored state: {}: {}".format(uid, k, self.clients[uid][k]))
+
         oldstate = self.clients[uid]['state'] if uid in self.clients else status['state']
         oldtime = self.clients[uid]['time'] if uid in self.clients else status['alive']
 
+        # only data collectors have a fingerprint
+        # oldfingerprint is either:
+        #  - the previous fingerprint we had recorded for this client, or
+        #  - None
+        # fingerprint is either:
+        #  - the current fingerprint we've just received in the status, or
+        #  - the previous fingerprint we had recorded for this client, or
+        #  - None
+        # in that order.
+        oldfingerprint = self.clients.get(uid, {}).get('fingerprint')
+        fingerprint = status.get('fingerprint', oldfingerprint)
+
+        # uidfp includes the fingerprint for data collectors
+        if fingerprint is not None:
+            uidfp = uid + ' ' + fingerprint
+        else:
+            uidfp = uid
+
+        # complain if fingerprint changes
+        if (fingerprint is not None and oldfingerprint is not None and
+            fingerprint != oldfingerprint):
+            logging.warning("fingerprint of {} {} state {} changed from {} to {}".format(status['type'], uid, status['state'], oldfingerprint, fingerprint))
+
         if uid not in self.clients:
-            logging.info("new {} {} joined and is {}".format(status['type'], uid, status['state']))
+            logging.info("new {} {} joined and is {}".format(status['type'], uidfp, status['state']))
 
         self.clients[uid] = status
         if oldstate == self.clients[uid]['state']:
@@ -306,8 +335,12 @@ class TallyServer(ServerFactory):
         else:
             self.clients[uid]['time'] = status['alive']
 
+        # remember the latest fingerprint for next time, in case the client forgets
+        if oldfingerprint is None and fingerprint is not None:
+            self.clients[uid]['fingerprint'] = fingerprint
+
         minutes = int((time() - status['time'])/ 60.0)
-        logging.info("----client status: {} {} is alive and {} for {} minutes (since {})".format(status['type'], uid, status['state'], minutes, status['time']))
+        logging.info("----client status: {} {} is alive and {} for {} minutes (since {})".format(status['type'], uidfp, status['state'], minutes, status['time']))
 
     def get_clock_padding(self, client_uids):
         max_delay = max([self.clients[uid]['rtt']+self.clients[uid]['clock_skew'] for uid in client_uids])

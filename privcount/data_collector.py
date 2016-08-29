@@ -1,6 +1,7 @@
 import os
 import logging
 import math
+import string
 import cPickle as pickle
 
 from time import time
@@ -32,6 +33,7 @@ class DataCollector(ReconnectingClientFactory):
         self.config = None
         self.aggregator = None
         self.aggregator_defer_id = None
+        self.fingerprint = None
 
     def buildProtocol(self, addr):
         return PrivCountClientProtocol(self)
@@ -69,8 +71,14 @@ class DataCollector(ReconnectingClientFactory):
         reactor.run()
 
     def get_status(self): # called by protocol
-        return {'type':'DataCollector', 'name':self.config['name'],
-        'state': 'active' if self.aggregator is not None else 'idle'}
+        status = {'type':'DataCollector', 'name':self.config['name'],
+                  'state': 'active' if self.aggregator is not None else 'idle'}
+        # store the fingerprint so we have it even when the aggregator goes away
+        if self.aggregator is not None and self.fingerprint is None:
+            self.fingerprint = self.aggregator.get_fingerprint()
+        if self.fingerprint is not None:
+            status['fingerprint'] = self.fingerprint
+        return status
 
     def set_server_status(self, status): # called by protocol
         log_tally_server_status(status)
@@ -263,6 +271,8 @@ class Aggregator(ReconnectingClientFactory):
         self.cli_ips_current = {}
         self.cli_ips_previous = {}
 
+        self.fingerprint = None
+
     def buildProtocol(self, addr):
         self.protocol = TorControlClientProtocol(self)
         return self.protocol
@@ -300,6 +310,31 @@ class Aggregator(ReconnectingClientFactory):
 
     def get_shares(self):
         return self.secure_counters.detach_blinding_shares()
+
+    def set_fingerprint(self, fingerprint):
+        fingerprint = fingerprint.strip()
+
+        # Do some basic validation of the fingerprint
+        if not len(fingerprint) == 40:
+            logging.warning("Bad fingerprint length %d: %s", len(fingerprint), fingerprint)
+            return False
+        if not all(c in string.hexdigits for c in fingerprint):
+            logging.warning("Bad fingerprint characters: %s", fingerprint)
+            return False
+
+        # Are we replacing an existing fingerprint?
+        if self.fingerprint is not None:
+            if self.fingerprint != fingerprint:
+                logging.warning("Replacing fingerprint %s with %s", self.fingerprint, fingerprint)
+            else:
+                logging.debug("Duplicate fingerprint received %s", fingerprint)
+
+        self.fingerprint = fingerprint
+
+        return True
+
+    def get_fingerprint(self):
+        return self.fingerprint
 
     def handle_event(self, event):
         if not self.secure_counters:

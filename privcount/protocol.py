@@ -329,8 +329,22 @@ class TorControlClientProtocol(LineOnlyReceiver):
         logging.debug("Received line '{}' from {}:{}:{}".format(line, peer.type, peer.host, peer.port))
 
         if self.state == 'authenticating' and line.strip() == "250 OK":
-            self.sendLine("SETEVENTS PRIVCOUNT")
-            self.state = 'processing'
+            self.sendLine("GETINFO fingerprint")
+            self.state = 'discovering'
+        elif self.state == 'discovering':
+            # Looks like a client
+            if line.strip() == "551 Not running in server mode":
+                logging.warning("Connection with {}:{}:{} failed: not a relay".format(peer.type, peer.host, peer.port))
+                self.quit()
+            # It's a relay, and it's just told us its fingerprint
+            elif line.startswith("250-fingerprint="):
+                _, _, fingerprint = line.partition("fingerprint=") # returns: part1, separator, part2
+                if not self.factory.set_fingerprint(fingerprint):
+                    self.quit()
+            # the fingerprint response has finished, let's start processing events
+            elif line.strip() == "250 OK":
+                self.sendLine("SETEVENTS PRIVCOUNT")
+                self.state = 'processing'
         elif self.state == 'processing' and line.startswith("650 PRIVCOUNT "):
             _, _, event = line.partition(" PRIVCOUNT ") # returns: part1, separator, part2
             if event != '':
@@ -350,12 +364,25 @@ class TorControlServerProtocol(LineOnlyReceiver):
 
     This is useful for emulating a Tor control server for testing purposes.
 
+    Alternately, run a temporary, non-publishing relay with:
+    tor DataDirectory /tmp/tor.$$ ORPort 12345 PublishServerDescriptor 0 ControlSocket /tmp/tor.$$/control_socket
+    And use stem's tor-promt to query it:
+    ./tor-prompt -s /tmp/tor.$$/control_socket
+    (where $$ is the PID of the shell tor is running in.)
+
     Example protocol run:
     telnet localhost 9051
     Connected to localhost.
     Escape character is '^]'.
     AUTHENTICATE
     250 OK
+    GETINFO
+    250 OK
+    GETINFO fingerprint
+    250-fingerprint=5E54527B88A544E1A6CBF412A1DE2B208E7BF9A2
+    250 OK
+    GETINFO blah
+    552 Unrecognized key "blah"
     SETEVENTS PRIVCOUNT
     552 Unrecognized event "PRIVCOUNT"
     SETEVENTS BW
@@ -399,6 +426,20 @@ class TorControlServerProtocol(LineOnlyReceiver):
                         self.factory.stop_injecting()
                 else:
                     self.sendLine('552 Unrecognized event ""')
+            elif parts[0] == "GETINFO":
+                # the correct response to an empty GETINFO is an empty OK
+                if len(parts) == 1:
+                    self.sendLine("250 OK")
+                # GETINFO is case-sensitive, and returns multiple lines
+                elif len(parts) == 2 and parts[1] == "fingerprint":
+                    self.sendLine("250-fingerprint=FACADE0000000000000000000123456789ABCDEF")
+                    self.sendLine("250 OK")
+                else:
+                    # strictly, GETINFO should process each word on the line
+                    # as a separate request for information.
+                    # But this is sufficient for our purposes, and is still
+                    # more-or-less conformant to the control spec.
+                    self.sendLine('552 Unrecognized key "{}"'.format(parts[1]))
             elif parts[0] == "QUIT":
                 self.factory.stop_injecting()
                 self.sendLine("250 closing connection")
