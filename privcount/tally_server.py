@@ -322,15 +322,16 @@ class TallyServer(ServerFactory):
         for uid in sk_uids:
             sk_public_keys[uid] = self.clients[uid]['public_key']
 
-        dc_names = {}
-        for uid in dc_uids:
-          dc_names[uid] = self.clients[uid]['name']
+        # clients don't provide some context until the end of the phase
+        # so we'll wait and pass the client context to collection_phase just
+        # before stopping it
 
-        self.collection_phase = CollectionPhase(self.config['collect_period'], self.config['counters'], sk_uids, sk_public_keys, dc_uids, self.config['q'], clock_padding, self.config['sigma'], dc_names, self.config['tally_server_info'])
+        self.collection_phase = CollectionPhase(self.config['collect_period'], self.config['counters'], sk_uids, sk_public_keys, dc_uids, self.config['q'], clock_padding, self.config['sigma'], self.config['tally_server_info'])
         self.collection_phase.start()
 
     def stop_collection_phase(self):
         assert self.collection_phase is not None
+        self.collection_phase.set_client_context(self.clients)
         self.collection_phase.stop()
         if self.collection_phase.is_stopped():
             self.num_completed_collection_phases += 1
@@ -366,7 +367,7 @@ class TallyServer(ServerFactory):
 
 class CollectionPhase(object):
 
-    def __init__(self, period, counters_config, sk_uids, sk_public_keys, dc_uids, param_q, clock_padding, sigma_config, dc_names, tally_server_info):
+    def __init__(self, period, counters_config, sk_uids, sk_public_keys, dc_uids, param_q, clock_padding, sigma_config, tally_server_info):
         # store configs
         self.period = period
         self.counters_config = counters_config
@@ -376,8 +377,8 @@ class CollectionPhase(object):
         self.param_q = param_q
         self.clock_padding = clock_padding
         self.sigma_config = sigma_config
-        self.dc_names = dc_names
         self.tally_server_info = tally_server_info
+        self.client_context = None
 
         # setup some state
         self.state = 'new' # states: new -> starting_dcs -> starting_sks -> started -> stopping -> stopped
@@ -549,6 +550,36 @@ class CollectionPhase(object):
         logging.info("sending stop command to {} {} request for counters".format(client_uid, msg))
         return config
 
+    # context is a dictionary of dictionaries, indexed by UID, and then by the
+    # attribute: name, fingerprint, ...
+    def set_client_context(self, context):
+        self.client_context = context
+
+    # returns a list of unique types of clients in self.client_context
+    def get_client_types(self):
+        types = []
+        if self.client_context is None:
+            return types
+        for uid in self.client_context:
+            for k in self.client_context[uid].keys():
+                if k == 'type' and not self.client_context[uid]['type'] in types:
+                    types.append(self.client_context[uid]['type'])
+        return types
+
+    # returns a context for each client by UID, grouped by client type
+    def get_client_context_by_type(self):
+        contexts = {}
+        if self.client_context is None:
+            return contexts
+        for type in self.get_client_types():
+            for uid in self.client_context:
+                if self.client_context[uid].get('type', 'NoType') == type:
+                    # make a copy, so we can delete unnecesary keys
+                    contexts.setdefault(type, {})[uid] = self.client_context[uid].copy()
+                    # remove the (inner) types, because they're redundant now
+                    del contexts[type][uid]['type']
+        return contexts
+
     # the context is written out with the tally results
     def get_result_context(self):
         result_context = {}
@@ -572,22 +603,20 @@ class CollectionPhase(object):
         result_count_context['Sigma'] = self.sigma_config
         result_context['Count'] = result_count_context
 
-        # add the privcount SKs that participated in the count
-        result_sk = {}
-        result_sk['UID'] = self.sk_uids
-        # the keys are large and unnecessary
-        #result_sk['PublicKey'] = self.sk_public_keys
-        result_context['SK'] = result_sk
+        # add the context for the clients that participated in the count
+        # this includes all status information by default
+        # clients are grouped by type, rather than listing them all by UID at
+        # the top level of the context
+        if self.client_context is not None:
+            result_context.update(self.get_client_context_by_type())
 
-        # add the privcount DCs that participated in the count
-        result_dc = {}
-        # Each name comes with a UID
-        #result_dc['UID'] = self.dc_uids
-        result_dc['Name'] = self.dc_names
-        result_context['DC'] = result_dc
+        # now remove any context we are sure we don't want
+        # currently, that's the share keepers' public keys: they're too long
+        for uid in result_context.get('ShareKeeper', {}):
+            del result_context['ShareKeeper'][uid]['public_key']
 
-        # add the tally server itself
-        result_context['TS'] = self.tally_server_info
+        # add the context for the tally server itself
+        result_context['TallyServer'] = self.tally_server_info
 
         return result_context
 
