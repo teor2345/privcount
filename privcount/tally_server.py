@@ -294,14 +294,12 @@ class TallyServer(ServerFactory):
         return status
 
     def set_client_status(self, uid, status): # called by protocol
+        # dump the status content at debug level
         for k in status.keys():
             logging.debug("{} sent status: {}: {}".format(uid, k, status[k]))
         if uid in self.clients:
             for k in self.clients[uid].keys():
                 logging.debug("{} has stored state: {}: {}".format(uid, k, self.clients[uid][k]))
-
-        oldstate = self.clients[uid]['state'] if uid in self.clients else status['state']
-        oldtime = self.clients[uid]['time'] if uid in self.clients else status['alive']
 
         # only data collectors have a fingerprint
         # oldfingerprint is either:
@@ -330,12 +328,13 @@ class TallyServer(ServerFactory):
         if uid not in self.clients:
             logging.info("new {} {} joined and is {}".format(status['type'], uidname, status['state']))
 
+        oldstate = self.clients[uid]['state'] if uid in self.clients else status['state']
         # for each key, replace the client value with the value from status,
         # or, if uid is a new client, initialise uid with status
         self.clients.setdefault(uid, status).update(status)
-        if oldstate == self.clients[uid]['state']:
-            self.clients[uid]['time'] = oldtime
-        else:
+        # use status['alive'] as the initial value of 'time'
+        self.clients[uid].setdefault('time', status['alive'])
+        if oldstate != self.clients[uid]['state']:
             self.clients[uid]['time'] = status['alive']
 
         minutes = int((time() - self.clients[uid]['time'])/ 60.0)
