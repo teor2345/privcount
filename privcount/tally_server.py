@@ -315,19 +315,20 @@ class TallyServer(ServerFactory):
         oldfingerprint = self.clients.get(uid, {}).get('fingerprint')
         fingerprint = status.get('fingerprint', oldfingerprint)
 
-        # uidfp includes the fingerprint for data collectors
-        if fingerprint is not None:
-            uidfp = uid + ' ' + fingerprint
-        else:
-            uidfp = uid
-
         # complain if fingerprint changes
         if (fingerprint is not None and oldfingerprint is not None and
             fingerprint != oldfingerprint):
             logging.warning("fingerprint of {} {} state {} changed from {} to {}".format(status['type'], uid, status['state'], oldfingerprint, fingerprint))
 
+        nickname = status.get('nickname', None)
+        # uidname includes the nickname for data collectors
+        if nickname is not None:
+            uidname = uid + ' ' + nickname
+        else:
+            uidname = uid
+
         if uid not in self.clients:
-            logging.info("new {} {} joined and is {}".format(status['type'], uidfp, status['state']))
+            logging.info("new {} {} joined and is {}".format(status['type'], uidname, status['state']))
 
         # for each key, replace the client value with the value from status,
         # or, if uid is a new client, initialise uid with status
@@ -338,7 +339,7 @@ class TallyServer(ServerFactory):
             self.clients[uid]['time'] = status['alive']
 
         minutes = int((time() - self.clients[uid]['time'])/ 60.0)
-        logging.info("----client status: {} {} is alive and {} for {} minutes (since {})".format(self.clients[uid]['type'], uidfp, self.clients[uid]['state'], minutes, self.clients[uid]['time']))
+        logging.info("----client status: {} {} is alive and {} for {} minutes (since {})".format(self.clients[uid]['type'], uidname, self.clients[uid]['state'], minutes, self.clients[uid]['time']))
 
     def get_clock_padding(self, client_uids):
         max_delay = max([self.clients[uid]['rtt']+self.clients[uid]['clock_skew'] for uid in client_uids])
