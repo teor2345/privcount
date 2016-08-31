@@ -337,8 +337,13 @@ class TallyServer(ServerFactory):
         if oldstate != self.clients[uid]['state']:
             self.clients[uid]['time'] = status['alive']
 
+        last_event_time = status.get('last_event_time', None)
+        last_event_message = ""
+        if last_event_time is not None:
+            last_event_minutes = int((time() - last_event_time)/ 60.0)
+            last_event_message = " last event {} ({} minutes ago)".format(last_event_time, last_event_minutes)
         minutes = int((time() - self.clients[uid]['time'])/ 60.0)
-        logging.info("----client status: {} {} is alive and {} for {} minutes (since {})".format(self.clients[uid]['type'], uidname, self.clients[uid]['state'], minutes, self.clients[uid]['time']))
+        logging.info("----client status: {} {} is alive and {} for {} minutes (since {}){}".format(self.clients[uid]['type'], uidname, self.clients[uid]['state'], minutes, self.clients[uid]['time'], last_event_message))
 
     def get_clock_padding(self, client_uids):
         max_delay = max([self.clients[uid]['rtt']+self.clients[uid]['clock_skew'] for uid in client_uids])

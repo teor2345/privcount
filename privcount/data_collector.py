@@ -493,6 +493,8 @@ class Aggregator(ReconnectingClientFactory):
             context['address'] = self.get_address()
         if self.get_fingerprint() is not None:
             context['fingerprint'] = self.get_fingerprint()
+        if self.last_event_time != 0:
+            context['last_event_time'] = self.last_event_time
         return context
 
     def handle_event(self, event):
