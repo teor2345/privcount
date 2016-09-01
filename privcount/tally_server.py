@@ -4,6 +4,7 @@ Created on Dec 12, 2015
 @author: rob
 '''
 import os
+import copy
 import json
 import logging
 import cPickle as pickle
@@ -362,7 +363,8 @@ class TallyServer(ServerFactory):
 
     def stop_collection_phase(self):
         assert self.collection_phase is not None
-        self.collection_phase.set_client_context(self.clients)
+        # make a deep copy, so we can delete unnecesary keys
+        self.collection_phase.set_client_context(copy.deep_copy(self.clients))
         self.collection_phase.stop()
         if self.collection_phase.is_stopped():
             self.num_completed_collection_phases += 1
@@ -605,8 +607,7 @@ class CollectionPhase(object):
         for type in self.get_client_types():
             for uid in self.client_context:
                 if self.client_context[uid].get('type', 'NoType') == type:
-                    # make a copy, so we can delete unnecesary keys
-                    contexts.setdefault(type, {})[uid] = self.client_context[uid].copy()
+                    contexts.setdefault(type, {})[uid] = self.client_context[uid]
                     # remove the (inner) types, because they're redundant now
                     del contexts[type][uid]['type']
         return contexts
