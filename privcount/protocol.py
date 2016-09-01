@@ -544,10 +544,7 @@ class TorControlServerProtocol(LineOnlyReceiver):
                 elif len(parts) == 2 and parts[1].lower() == "dirport":
                     self.sendLine("250 DirPort=9030")
                 else:
-                    # strictly, GETCONF should process each word on the line
-                    # as a separate request for information.
-                    # But this is sufficient for our purposes, and is still
-                    # more-or-less conformant to the control spec.
+                    # Like GETINFO, our GETCONF does not accept multiple words
                     self.sendLine('552 Unrecognized configuration key "{}"'.format(parts[1]))
             elif parts[0] == "QUIT":
                 self.factory.stop_injecting()
