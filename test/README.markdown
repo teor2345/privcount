@@ -10,6 +10,10 @@ PYTHONPATH setup properly so that you can call `privcount` without providing a f
 
 ## Running the test
 
+This test script installs the latest version of privcount, and then runs all the steps listed below, terminating all the privcount processes after the tally server produces a results file:
+
+    ./run_test.sh
+
 Start the event server that will supply events to the data collector:
 
     privcount inject --simulate --port 20003 --log events.txt
