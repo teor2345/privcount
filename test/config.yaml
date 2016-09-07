@@ -6,7 +6,7 @@ tally_server:
     sk_threshold: 1 # number of share keeper nodes required before starting
     dc_threshold: 1 # number of data collector nodes required before starting
     # The elapsed test time is approximately:
-    #     collect_period + 2*event_period + 2*checkin_period + 3 seconds
+    #     collect_period + 2*event_period
     collect_period: 30 # (no default, 1 week = 604800 seconds) the safe time frame of stats collection for all stats
     # There must be at least two event periods in each collect period
     event_period: 15 # (default: 60 seconds) how often the TS event loop runs
