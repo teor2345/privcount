@@ -35,7 +35,7 @@ mv privcount.* old/
 
 # Then run the injector, ts, sk, and dc
 echo "Launching injector, tally server, share keeper, and data collector..."
-privcount inject --port 20003 --log events.txt --simulate &
+privcount inject --simulate --port 20003 --log events.txt &
 privcount ts config.yaml &
 privcount sk config.yaml &
 privcount dc config.yaml &
