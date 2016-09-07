@@ -3,34 +3,33 @@
 # If you have privcount installed in a venv, activate it before running
 # this script
 
-# Show how long it took
+# Process arguments
+if [ $# -lt 1 -o $# -gt 2 ]; then
+  echo "usage: $0 [-I] <privcount-directory>"
+  echo "       -I: run 'pip install -I <privcount-directory>' before testing"
+  exit 1
+elif [ $# -eq 1 ]; then
+  PRIVCOUNT_INSTALL=0
+  PRIVCOUNT_DIRECTORY="$1"
+elif [ $# -eq 2 ]; then
+  PRIVCOUNT_INSTALL=1
+  PRIVCOUNT_DIRECTORY="$2"
+fi
+
+if [ "$PRIVCOUNT_INSTALL" -eq 1 ]; then
+  # Install the latest privcount version
+  echo "Installing latest version of privcount from '$PRIVCOUNT_DIRECTORY' ..."
+  pip install -I "$PRIVCOUNT_DIRECTORY"
+fi
+
+cd "$PRIVCOUNT_DIRECTORY/test"
+
+# Record how long the tests take to run
 date
 STARTSEC="`date +%s`"
 
-# Find the privcount directory based on the name of the script
-TESTDIR="`dirname $0`"
-PRIVDIR="`dirname $TESTDIR`"
-if [ ! -f "$PRIVDIR/setup.py" ]; then
-  # or the current directory
-  if [ -f "setup.py" ]; then
-    PRIVDIR="."
-  elif [ -f "../setup.py" ]; then
-    PRIVDIR=".."
-  else
-    unset PRIVDIR
-    echo "Couldn't find privcount directory."
-    exit 1
-  fi
-fi
-
-# Install the latest privcount version
-echo "Installing latest version of privcount from '$PRIVDIR' ..."
-pip install -I "$PRIVDIR"
-
-cd "$PRIVDIR/test"
-
 # Move aside the old result files
-echo "Moving old results files to '$PRIVDIR/test/old' ..."
+echo "Moving old results files to '$PRIVCOUNT_DIRECTORY/test/old' ..."
 mkdir -p old
 mv privcount.* old/
 
