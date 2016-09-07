@@ -46,6 +46,10 @@ while [ ! -f privcount.outcome.*.json ]; do
   sleep 1
 done
 
+# Measure how long the actual tests took
+ENDDATE=`date`
+ENDSEC="`date +%s`"
+
 # Plot the tallies file
 echo "Plotting results..."
 privcount plot -d privcount.tallies.*.json test
@@ -55,7 +59,6 @@ echo "Terminating privcount..."
 pkill -P $$
 
 # Show how long it took
-date
-ENDSEC="`date +%s`"
+echo "$ENDDATE"
 ELAPSEDSEC=$[ $ENDSEC - $STARTSEC ]
 echo "Seconds Elapsed: $ELAPSEDSEC"
