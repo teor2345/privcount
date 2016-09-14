@@ -308,23 +308,49 @@ def format_last_event_time_since(last_event_timestamp):
 
 ## Calculation ##
 
+# Sample noise from a gussian distribution
+# the distribution is over +/- sigma, scaled by the noise weight
+# calculated from the exit probability p_exit, and the overall sum_of_sq
+# bandwidth
+# returns a floating-point value between +sigma and -sigma, scaled by
+# noise_weight
 def noise(sigma, sum_of_sq, p_exit):
     sigma_i = p_exit * sigma / sqrt(sum_of_sq)
     random_sample = gauss(0, sigma_i)
     return random_sample
 
+# Calculate pseudo-random bytes using a keyed hash based on key and IV
+# Given the same key and IV, the same pseudo-random bytes will be produced
+# key must contain at least as many bits of entropy as the hash
+# Therefore, it must be at least 32 bytes long
+# returns 32 pseudo-random bytes
 def PRF(key, IV):
-    return Hash("PRF1|KEY:%s|IV:%s|" % (key, IV)).digest()
+    prv = Hash("PRF1|KEY:%s|IV:%s|" % (key, IV)).digest()
+    # for security, the key input must have at least as many bytes as the hash
+    # output (we do not depend on the length or content of IV for security)
+    assert len(key) >= len(prv)
+    return prv
 
+# Sample a uniformly pseudo-random value from the random byte array s,
+# returning a value with maximum q
+# s must be at least 8 bytes long
+# the returned value has a maximum of 2**64 - 1, so q is limited to 2**64
+# returns a uniformly distributed in [0, q)
 def sample(s, q):
+    assert len(s) >= 8
+    assert long(q) <= 2L**64L
     ## Unbiased sampling through rejection sampling
     while True:
-        v = struct.unpack("<L", s[:4])[0]
-        if 0 <= v < q:
+        v = long(struct.unpack("<Q", s[:8])[0])
+        if 0L <= v < q:
             break
+        # when we reject the value, re-hash s and try again
         s = Hash(s).digest()
     return v
 
+# Calculate a blinding factor with maximum q, based on label and secret
+# when positive is True, return the blinding factor, and when positive is
+# False, returns the unblinding factor (the inverse value mod q)
 def derive_blinding_factor(label, secret, q, positive=True):
     ## Keyed share derivation
     s = PRF(secret, label)
@@ -385,23 +411,24 @@ class SecureCounters(object):
 
     def __init__(self, counters, q):
         self.counters = deepcopy(counters)
-        self.q = q
+        self.q = long(q)
         self.shares = None
 
         # initialize all counters to 0
+        # counters use unlimited length integers to avoid overflow
         for key in self.counters:
             if 'bins' not in self.counters[key]:
                 return None
             for item in self.counters[key]['bins']:
                 assert len(item) == 2
-                item.append(0.0) # bin is now, e.g.: [0.0, 512.0, 0.0] for bin_left, bin_right, count
+                item.append(0L) # bin is now, e.g.: [0.0, 512.0, 0L] for bin_left, bin_right, count
 
     def _derive_all_counters(self, secret, positive):
         for key in self.counters:
             for item in self.counters[key]['bins']:
                 label = "{}_{}_{}".format(key, item[0], item[1])
                 blinding_factor = derive_blinding_factor(label, secret, self.q, positive=positive)
-                item[2] = (item[2] + blinding_factor) % self.q
+                item[2] = (item[2] + long(blinding_factor)) % self.q
 
     def _blind(self, secret):
         self._derive_all_counters(secret, True)
@@ -412,7 +439,7 @@ class SecureCounters(object):
     def generate(self, uids, noise_weight):
         self.shares = {}
         for uid in uids:
-            secret = urandom(20)
+            secret = urandom(32)
             hash_id = PRF(secret, "KEYID")
             self.shares[uid] = {'secret': secret, 'hash_id': hash_id}
             # add blinding factors to all of the counters
@@ -423,7 +450,7 @@ class SecureCounters(object):
             for item in self.counters[key]['bins']:
                 sigma = self.counters[key]['sigma']
                 sampled_noise = noise(sigma, 1, noise_weight)
-                noise_val = int(round(sampled_noise))
+                noise_val = long(round(sampled_noise))
                 item[2] = (item[2] + noise_val) % self.q
 
     def detach_blinding_shares(self):
@@ -440,11 +467,11 @@ class SecureCounters(object):
         # reverse blinding factors for all of the counters
         self._unblind(b64decode(share['secret']))
 
-    def increment(self, counter_key, bin_value, num_increments=1.0):
+    def increment(self, counter_key, bin_value, num_increments=1L):
         if self.counters is not None and counter_key in self.counters:
             for item in self.counters[counter_key]['bins']:
                 if bin_value >= item[0] and bin_value < item[1]:
-                    item[2] = (item[2] + num_increments) % self.q
+                    item[2] = (item[2] + long(num_increments)) % self.q
 
     def _tally_counter(self, counter):
         if self.counters == None:
@@ -483,7 +510,7 @@ class SecureCounters(object):
         # (negative counts are possible if noise is negative)
         for key in self.counters:
             for tally_bin in self.counters[key]['bins']:
-                if tally_bin[2] > (self.q / 2):
+                if tally_bin[2] > (self.q // 2L):
                     tally_bin[2] -= self.q
         return True
 
@@ -507,7 +534,10 @@ def prob_exit(consensus_path, my_fingerprint, fingerprint_pool=None):
     DW = float(net_status.bandwidth_weights['Wed'])/10000
     EW = float(net_status.bandwidth_weights['Wee'])/10000
 
-    my_bandwidth, DBW, EBW, sum_of_sq_bw = 0, 0, 0, 0
+    # we must use longs here, because otherwise sum_of_sq_bw can overflow on
+    # platforms where python has 32-bit ints
+    # (on these platforms, this happens when router_entry.bandwidth > 65535)
+    my_bandwidth, DBW, EBW, sum_of_sq_bw = 0L, 0L, 0L, 0L
 
     if my_fingerprint in net_status.routers:
         my_bandwidth = net_status.routers[my_fingerprint].bandwidth
