@@ -65,10 +65,6 @@ def increment_counters(dc_list, N):
         #bin[4]
         sc_dc.increment('Bytes', 4096.0)
         sc_dc.increment('Bytes', 10000.0)
-        pass
-        #bin[4]
-        sc_dc.increment('Bytes', 4096.0, X)
-        sc_dc.increment('Bytes', 10000.0, X)
 
 # Sums the counters in dc_list and sk_list, with maximum count q
 # Returns a tallies object populated with the resulting counts
