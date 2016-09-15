@@ -44,23 +44,31 @@ def create_counters(counters, q):
     sc_sk2.import_blinding_share(shares['sk2'])
     return ([sc_dc], [sc_sk1, sc_sk2])
 
-# do N increments at the dc, some bins get more increments than others
+
+# run a set of increments at the dc N times, using the two-argument form of
+# increment() to increment by 1 each time
+# each bin has 0, 1, or 2 values added per increment
+# Returns N
 def increment_counters(dc_list, N):
     sc_dc = dc_list[0]
     for _ in xrange(int(N)):
         # bin[0]
         sc_dc.increment('Bytes', 0.0)
         sc_dc.increment('Bytes', 511.0)
-    #bin[1]
+        #bin[1]
         sc_dc.increment('Bytes', 600.0)
-    #bin[2]
+        #bin[2]
         sc_dc.increment('Bytes', 1024.0)
         sc_dc.increment('Bytes', 2047.0)
-    #bin[3]
+        #bin[3]
         pass
-    #bin[4]
-    sc_dc.increment('Bytes', 4096.0)
-    sc_dc.increment('Bytes', 10000.0)
+        #bin[4]
+        sc_dc.increment('Bytes', 4096.0)
+        sc_dc.increment('Bytes', 10000.0)
+        pass
+        #bin[4]
+        sc_dc.increment('Bytes', 4096.0, X)
+        sc_dc.increment('Bytes', 10000.0, X)
 
 # Sums the counters in dc_list and sk_list, with maximum count q
 # Returns a tallies object populated with the resulting counts
@@ -80,15 +88,16 @@ def sum_counters(counters, q, dc_list, sk_list):
 # repetitions N
 def check_counters(tallies, N):
     print tallies
-    assert tallies['Bytes']['bins'][0][2] == 2.0*N
-    assert tallies['Bytes']['bins'][1][2] == 1.0*N
-    assert tallies['Bytes']['bins'][2][2] == 2.0*N
-    assert tallies['Bytes']['bins'][3][2] == 0.0*N
-    assert tallies['Bytes']['bins'][4][2] == 2.0*N
-    assert tallies['SanityCheck']['bins'][0][2] == 0.0
+    assert tallies['Bytes']['bins'][0][2] == 2*N
+    assert tallies['Bytes']['bins'][1][2] == 1*N
+    assert tallies['Bytes']['bins'][2][2] == 2*N
+    assert tallies['Bytes']['bins'][3][2] == 0*N
+    assert tallies['Bytes']['bins'][4][2] == 2*N
+    assert tallies['SanityCheck']['bins'][0][2] == 0
     print "all counts are correct!"
 
 # Check that secure counters increment correctly for small values of N
+# using the default increment of 1
 N = 500.0
 (dc_list, sk_list) = create_counters(counters, q)
 increment_counters(dc_list, N)
