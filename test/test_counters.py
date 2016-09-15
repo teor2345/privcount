@@ -48,9 +48,10 @@ def create_counters(counters, q):
 
 # run a set of increments at the dc N times, using the two-argument form of
 # increment() to increment by 1 each time
-# each bin has 0, 1, or 2 values added per increment
+# each bin has 0, 1, or 2 values added per increment when multi_bin is True,
+# and 0 or 1 values added per increment when multi_bin is False
 # Returns long(N)
-def increment_counters(dc_list, N):
+def increment_counters(dc_list, N, multi_bin=True):
     sc_dc = dc_list[0]
     # xrange only accepts python ints, which is ok, because it's impossible to
     # increment more than 2**31 times in any reasonable test duration
@@ -58,23 +59,27 @@ def increment_counters(dc_list, N):
     for _ in xrange(int(N)):
         # bin[0]
         sc_dc.increment('Bytes', 0.0)
-        sc_dc.increment('Bytes', 511.0)
+        if multi_bin:
+            sc_dc.increment('Bytes', 511.0)
         #bin[1]
         sc_dc.increment('Bytes', 600.0)
         #bin[2]
-        sc_dc.increment('Bytes', 1024.0)
+        if multi_bin:
+            sc_dc.increment('Bytes', 1024.0)
         sc_dc.increment('Bytes', 2047.0)
         #bin[3]
         pass
         #bin[4]
         sc_dc.increment('Bytes', 4096.0)
-        sc_dc.increment('Bytes', 10000.0)
+        if multi_bin:
+            sc_dc.increment('Bytes', 10000.0)
     return long(N)
 
 # run a set of increments at the dc N times, incrementing by X each time
-# each bin has 0, 1, or 2 values added per increment
+# each bin has 0, 1, or 2 values added per increment when multi_bin is True,
+# and 0 or 1 values added per increment when multi_bin is False
 # Returns long(N) * long(X)
-def increment_counters_num(dc_list, N, X=1L):
+def increment_counters_num(dc_list, N, X=1L, multi_bin=True):
     sc_dc = dc_list[0]
     # xrange only accepts python ints, which is ok, because it's impossible to
     # increment more than 2**31 times in any reasonable test duration
@@ -82,17 +87,20 @@ def increment_counters_num(dc_list, N, X=1L):
     for _ in xrange(int(N)):
         # bin[0]
         sc_dc.increment('Bytes', 0.0, long(X))
-        sc_dc.increment('Bytes', 511.0, long(X))
+        if multi_bin:
+            sc_dc.increment('Bytes', 511.0, long(X))
         #bin[1]
         sc_dc.increment('Bytes', 600.0, long(X))
         #bin[2]
-        sc_dc.increment('Bytes', 1024.0, long(X))
+        if multi_bin:
+            sc_dc.increment('Bytes', 1024.0, long(X))
         sc_dc.increment('Bytes', 2047.0, long(X))
         #bin[3]
         pass
         #bin[4]
         sc_dc.increment('Bytes', 4096.0, long(X))
-        sc_dc.increment('Bytes', 10000.0, long(X))
+        if multi_bin:
+            sc_dc.increment('Bytes', 10000.0, long(X))
     return long(N)*long(X)
 
 # Sums the counters in dc_list and sk_list, with maximum count q
@@ -110,53 +118,93 @@ def sum_counters(counters, q, dc_list, sk_list):
     return sc_ts.detach_counts()
 
 # Checks that the tallies are the expected values, based on the number of
-# repetitions N
-def check_counters(tallies, N):
+# repetitions N, and whether we're in multi_bin mode
+def check_counters(tallies, N, multi_bin=True):
     print tallies
-    assert tallies['Bytes']['bins'][0][2] == 2*N
+    if multi_bin:
+        assert tallies['Bytes']['bins'][0][2] == 2*N
+    else:
+        assert tallies['Bytes']['bins'][0][2] == 1*N
     assert tallies['Bytes']['bins'][1][2] == 1*N
-    assert tallies['Bytes']['bins'][2][2] == 2*N
+    if multi_bin:
+        assert tallies['Bytes']['bins'][2][2] == 2*N
+    else:
+        assert tallies['Bytes']['bins'][2][2] == 1*N
     assert tallies['Bytes']['bins'][3][2] == 0*N
-    assert tallies['Bytes']['bins'][4][2] == 2*N
+    if multi_bin:
+        assert tallies['Bytes']['bins'][4][2] == 2*N
+    else:
+        assert tallies['Bytes']['bins'][4][2] == 1*N
     assert tallies['SanityCheck']['bins'][0][2] == 0
     print "all counts are correct!"
+
+# Validate that a counter run with counters, q, N, X, and multi_bin works,
+# and produces consistent results
+# If X is None, use the 2-argument form of increment, otherwise, use the
+# 3-argument form
+def try_counters(counters, q, N, X=None, multi_bin=True):
+    (dc_list, sk_list) = create_counters(counters, q)
+    if X is None:
+        # use the 2-argument form
+        amount = increment_counters(dc_list, N, multi_bin)
+        assert amount == N
+    else:
+        # use the 3-argument form
+        amount = increment_counters_num(dc_list, N, X, multi_bin)
+        assert amount == N*X
+    tallies = sum_counters(counters, q, dc_list, sk_list)
+    check_counters(tallies, amount, multi_bin)
 
 # Check that secure counters increment correctly for small values of N
 # using the default increment of 1
 print "Multiple increments, 2-argument form of increment:"
 N = 500L
-(dc_list, sk_list) = create_counters(counters, q)
-amount = increment_counters(dc_list, N)
-assert amount == N
-tallies = sum_counters(counters, q, dc_list, sk_list)
-check_counters(tallies, amount)
+try_counters(counters, q, N)
 
 # Check that secure counters increment correctly for a single increment
 # using a small value of num_increment
 print "Single increment, 3-argument form of increment:"
 N = 1L
 X = 500L
-(dc_list, sk_list) = create_counters(counters, q)
-amount = increment_counters_num(dc_list, N, X)
-assert amount == N*X
-tallies = sum_counters(counters, q, dc_list, sk_list)
-check_counters(tallies, amount)
+try_counters(counters, q, N, X)
 
 # And multiple increments using the 3-argument form
 print "Multiple increments, 3-argument form of increment, explicit +1:"
 N = 500L
 X = 1L
-(dc_list, sk_list) = create_counters(counters, q)
-amount = increment_counters_num(dc_list, N, X)
-assert amount == N*X
-tallies = sum_counters(counters, q, dc_list, sk_list)
-check_counters(tallies, amount)
+try_counters(counters, q, N, X)
 
 print "Multiple increments, 3-argument form of increment, explicit +2:"
 N = 250L
 X = 2L
-(dc_list, sk_list) = create_counters(counters, q)
-amount = increment_counters_num(dc_list, N, X)
-assert amount == N*X
-tallies = sum_counters(counters, q, dc_list, sk_list)
-check_counters(tallies, amount)
+try_counters(counters, q, N, X)
+
+print "Multiple increments, 2-argument form of increment, multi_bin=False:"
+N = 20L
+try_counters(counters, q, N, multi_bin=False)
+
+print "Multiple increments, 3-argument form of increment, multi_bin=False:"
+N = 20L
+X = 1L
+try_counters(counters, q, N, X, multi_bin=False)
+
+print "Increasing increments, designed to trigger an overflow:"
+N = 1L
+
+a = 1L
+X = 2L**a
+# we interpret values >= q/2 as negative, so there's no point testing them
+# (privcount requires that the total counts are much less than q/2)
+while X < q/2L:
+    print "Trying count 2**{} = {} < q/2 ({})".format(a, X, q/2)
+    try_counters(counters, q, N, X, multi_bin=False)
+    # This should terminate in at most ~log2(q) steps
+    a += 1L
+    X = 2L**a
+
+# Now try q/2-1 explicitly
+N = 1L
+X = q/2L - 1L
+print "Trying count = q/2 - 1 = {}".format(X)
+try_counters(counters, q, N, X, multi_bin=False)
+print "Reached q/2 - 1 = {} without overflowing".format(X)
