@@ -3,7 +3,7 @@
 from privcount.util import SecureCounters
 
 # This maximum must be kept the same as privcount's configured q value
-q = 2147483647
+q = 999999999959
 
 # A simple set of byte counters
 counters = {
