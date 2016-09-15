@@ -1,9 +1,10 @@
 #!/usr/bin/python
 
 from privcount.util import SecureCounters
+import sys
 
 # This maximum must be kept the same as privcount's configured q value
-q = 999999999959
+q = 999999999959L
 
 # A simple set of byte counters
 counters = {
@@ -48,9 +49,12 @@ def create_counters(counters, q):
 # run a set of increments at the dc N times, using the two-argument form of
 # increment() to increment by 1 each time
 # each bin has 0, 1, or 2 values added per increment
-# Returns N
+# Returns long(N)
 def increment_counters(dc_list, N):
     sc_dc = dc_list[0]
+    # xrange only accepts python ints, which is ok, because it's impossible to
+    # increment more than 2**31 times in any reasonable test duration
+    assert N <= sys.maxint
     for _ in xrange(int(N)):
         # bin[0]
         sc_dc.increment('Bytes', 0.0)
@@ -65,6 +69,31 @@ def increment_counters(dc_list, N):
         #bin[4]
         sc_dc.increment('Bytes', 4096.0)
         sc_dc.increment('Bytes', 10000.0)
+    return long(N)
+
+# run a set of increments at the dc N times, incrementing by X each time
+# each bin has 0, 1, or 2 values added per increment
+# Returns long(N) * long(X)
+def increment_counters_num(dc_list, N, X=1L):
+    sc_dc = dc_list[0]
+    # xrange only accepts python ints, which is ok, because it's impossible to
+    # increment more than 2**31 times in any reasonable test duration
+    assert N <= sys.maxint
+    for _ in xrange(int(N)):
+        # bin[0]
+        sc_dc.increment('Bytes', 0.0, long(X))
+        sc_dc.increment('Bytes', 511.0, long(X))
+        #bin[1]
+        sc_dc.increment('Bytes', 600.0, long(X))
+        #bin[2]
+        sc_dc.increment('Bytes', 1024.0, long(X))
+        sc_dc.increment('Bytes', 2047.0, long(X))
+        #bin[3]
+        pass
+        #bin[4]
+        sc_dc.increment('Bytes', 4096.0, long(X))
+        sc_dc.increment('Bytes', 10000.0, long(X))
+    return long(N)*long(X)
 
 # Sums the counters in dc_list and sk_list, with maximum count q
 # Returns a tallies object populated with the resulting counts
@@ -94,8 +123,40 @@ def check_counters(tallies, N):
 
 # Check that secure counters increment correctly for small values of N
 # using the default increment of 1
-N = 500.0
+print "Repeated increments, 2-argument form of increment:"
+N = 500L
 (dc_list, sk_list) = create_counters(counters, q)
-increment_counters(dc_list, N)
+amount = increment_counters(dc_list, N)
+assert amount == N
 tallies = sum_counters(counters, q, dc_list, sk_list)
-check_counters(tallies, N)
+check_counters(tallies, amount)
+
+# Check that secure counters increment correctly for a single increment
+# using a small value of num_increment
+print "Single increment, 3-argument form of increment:"
+N = 1L
+X = 500L
+(dc_list, sk_list) = create_counters(counters, q)
+amount = increment_counters_num(dc_list, N, X)
+assert amount == N*X
+tallies = sum_counters(counters, q, dc_list, sk_list)
+check_counters(tallies, amount)
+
+# And multiple increments using the 3-argument form
+print "Multiple increments, 3-argument form of increment, explicit +1:"
+N = 500L
+X = 1L
+(dc_list, sk_list) = create_counters(counters, q)
+amount = increment_counters_num(dc_list, N, X)
+assert amount == N*X
+tallies = sum_counters(counters, q, dc_list, sk_list)
+check_counters(tallies, amount)
+
+print "Multiple increments, 3-argument form of increment, explicit +2:"
+N = 250L
+X = 2L
+(dc_list, sk_list) = create_counters(counters, q)
+amount = increment_counters_num(dc_list, N, X)
+assert amount == N*X
+tallies = sum_counters(counters, q, dc_list, sk_list)
+check_counters(tallies, amount)
