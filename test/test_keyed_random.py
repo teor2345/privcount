@@ -1,5 +1,9 @@
 #!/usr/bin/python
 
+# a simple range and bin test for privcount's random constructions
+# this test can not prove that these constructs produce uniformly random
+# results, it can only reveal obvious range or partition issues
+
 from os import urandom
 from random import randrange
 from privcount.util import sample, derive_blinding_factor
@@ -35,6 +39,9 @@ BIN_COUNT = 2
 def random_value(key, max):
     # random.randrange() takes one argument: a maximum value
     # and returns a random value in [0, max)
+    # it is *NOT* uniformy distributed in python versions < 3.2
+    # but this test is not sophisticated enough to pick that up
+    # https://docs.python.org/3.5/library/random.html#random.randrange
     return randrange(max)
 
 # call privcount.util.sample with key and max
