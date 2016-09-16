@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 from privcount.util import SecureCounters
+from math import sqrt
 import sys
 
 # This q must be kept the same as privcount's configured q value
@@ -33,6 +34,41 @@ counters = {
   }
 }
 
+# check that each blinding share is unique
+# if not, there is a coding error that affects the security of the system
+def check_blinding_shares(shares):
+    blinding_share_list = []
+    for sk_name in shares:
+        blinding_share_list.append(shares[sk_name]['secret'])
+    # are all the blinding shares unique?
+    # since there are only 2 x 256 bit values, collisions are very unlikely
+    assert len(blinding_share_list) == len(set(blinding_share_list))
+
+# check that each blinding value is unique
+# if not, there is a coding error that affects the security of the system
+def check_blinding_values(secure_counters, q):
+    blinding_value_list = []
+    for key in secure_counters.counters:
+        for item in secure_counters.counters[key]['bins']:
+            blinding_value_list.append(item[2])
+    # are all the blinding values unique?
+    # only check this if the number of items is very small compared with q
+    # RAM bit error rates are up to 10^-13 per second
+    # http://www.cs.toronto.edu/~bianca/papers/sigmetrics09.pdf
+    # So this check should fail by chance less often than a hardware error
+    # Using the approximation from
+    # https://en.wikipedia.org/wiki/Birthday_problem#Square_approximation
+    # n = sqrt(2m * p(n)) where m is q and p(n) is 10^-13
+    max_blinding_value_count = sqrt(2.0 * (q / (10L**13L)))
+    blinding_value_count = len(blinding_value_list)
+    unique_blinding_value_count = len(set(blinding_value_list))
+    print "q: {} max_blinding: {} actual blinding: {}".format(
+        q, max_blinding_value_count, blinding_value_count)
+    if blinding_value_count < max_blinding_value_count:
+        assert blinding_value_count == unique_blinding_value_count
+    else:
+        print "skipping blinding value collision test: collisions too likely"
+
 # create the counters for a data collector, who will generate the shares and
 # noise
 # uses q to generate the appropriate blinding factors
@@ -40,14 +76,20 @@ counters = {
 def create_counters(counters, q):
     sc_dc = SecureCounters(counters, q)
     sc_dc.generate(['sk1', 'sk2'], 1.0)
+    check_blinding_values(sc_dc, q)
     # get the shares used to init the secure counters on the share keepers
     shares = sc_dc.detach_blinding_shares()
+
+    # make sure the blinding shares are unique
+    check_blinding_shares(shares)
 
     # create share keeper versions of the counters
     sc_sk1 = SecureCounters(counters, q)
     sc_sk1.import_blinding_share(shares['sk1'])
+    check_blinding_values(sc_sk1, q)
     sc_sk2 = SecureCounters(counters, q)
     sc_sk2.import_blinding_share(shares['sk2'])
+    check_blinding_values(sc_sk2, q)
     return ([sc_dc], [sc_sk1, sc_sk2])
 
 
