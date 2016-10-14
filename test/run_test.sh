@@ -20,6 +20,11 @@ elif [ $# -eq 2 ]; then
 fi
 
 if [ "$PRIVCOUNT_INSTALL" -eq 1 ]; then
+  # Install the latest requirements
+  # Unfortunately, this doesn't work on my OS X install without sudo
+  #echo "Installing requirements from '$PRIVCOUNT_DIRECTORY' ..."
+  #pip install -r "$PRIVCOUNT_DIRECTORY/requirements.txt"
+
   # Install the latest privcount version
   echo "Installing latest version of privcount from '$PRIVCOUNT_DIRECTORY' ..."
   pip install -I "$PRIVCOUNT_DIRECTORY"
@@ -30,6 +35,10 @@ cd "$PRIVCOUNT_DIRECTORY/test"
 # Run the python-based unit tests
 echo "Testing time formats:"
 python test_format_time.py
+echo ""
+
+echo "Testing encryption:"
+python test_encryption.py
 echo ""
 
 echo "Testing keyed hash:"
@@ -73,8 +82,8 @@ while echo "$JOB_STATUS" | grep -q "Running"; do
     pkill -P $$
     exit 1
   fi
-  # succeed if an outcomes file is produced
-  if [ -f privcount.outcomes.*.json ]; then
+  # succeed if an outcome file is produced
+  if [ -f privcount.outcome.*.json ]; then
     break
   fi
   sleep 1
