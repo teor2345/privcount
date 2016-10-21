@@ -10,7 +10,7 @@ from base64 import b64decode
 
 from protocol import PrivCountClientProtocol, TorControlClientProtocol
 from tally_server import log_tally_server_status
-from util import SecureCounters, log_error, get_public_digest_string, load_public_key_string, encrypt, format_delay_time_wait, format_last_event_time_since, normalise_path, counter_modulus, add_counter_limits_to_config
+from util import SecureCounters, log_error, get_public_digest_string, load_public_key_string, encrypt, format_delay_time_wait, format_last_event_time_since, normalise_path, counter_modulus, add_counter_limits_to_config, check_noise_weight_config
 
 import yaml
 
@@ -100,6 +100,12 @@ class DataCollector(ReconnectingClientFactory):
         if ('sharekeepers' not in config or 'counters' not in config or
             'noise_weight' not in config or 'dc_threshold' not in config):
             return None
+
+        # if the noise weights don't pass the validity checks, fail
+        if not check_noise_weight_config(config['noise_weight'],
+                                         config['dc_threshold']):
+            return None
+
         # if we are still running from a previous incarnation, we need to stop first
         if self.aggregator is not None:
             return None
