@@ -673,16 +673,10 @@ def check_noise_weight_value(noise_weight_value, description="value"):
 def check_noise_weight_sum(noise_weight_sum, description="sum"):
     '''
     Check that noise_weight_sum is a valid summed noise weight.
-    Noise weight sums must not reduce the overall noise.
-    They must also pass check_noise_weight_value().
+    Noise weight sums must pass check_noise_weight_value().
     Returns True if the noise weight sum is valid.
     Logs a specific warning using description and returns False if it is not.
     '''
-    # Do the stricter check first, to produce accurate logs
-    if noise_weight_sum < 1.0:
-        logging.warning("Noise weight {} must be greater than 1.0, was {}"
-                        .format(description, noise_weight_sum))
-        return False
     if not check_noise_weight_value(noise_weight_sum, description):
         return False
     return True
@@ -707,13 +701,6 @@ def check_noise_weight_config(noise_weight_config, dc_threshold):
             return False
     # the sum must be valid
     if not check_noise_weight_sum(sum(noise_weight_config.values())):
-        return False
-    # more strictly, the bottom dc_threshold of noise_weights must not
-    # reduce the total noise
-    sorted_noise_weights = sorted(noise_weight_config.values())
-    lowest_noise_weights = sorted_noise_weights[:dc_threshold]
-    if not check_noise_weight_sum(sum(lowest_noise_weights),
-                                  "sum of the lowest threshold"):
         return False
     return True
 
