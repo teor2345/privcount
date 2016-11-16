@@ -144,13 +144,13 @@ def get_epsilon_consumed(stats_parameters, excess_noise_ratio, sigma_ratio,
     stat_delta = float(delta) / len(stats_parameters)
     epsilons = dict()
     for param, (sensitivity, val) in stats_parameters.iteritems():
-        sigma = float(sigma_ratio) * val / math.sqrt(excess_noise_ratio)
+        sigma = get_sigma(excess_noise_ratio, sigma_ratio, val)
         epsilon = get_differentially_private_epsilon(sensitivity, sigma, stat_delta, tol=tol)
         epsilons[param] = epsilon
 
     return epsilons
 
-def get_opt_sigma(excess_noise_ratio, sigma_ratio, estimated_value):
+def get_sigma(excess_noise_ratio, sigma_ratio, estimated_value):
     '''
     Calculate the (optimal) sigma from the excess noise ratio, (optimal)
     sigma ratio, and per-statistic expected value.
@@ -167,7 +167,7 @@ def get_expected_noise_ratio(excess_noise_ratio, sigma, estimated_value):
     '''
     Calculate the expected noise ratio from the excess noise ratio,
     and per-statistic sigma and expected value.
-    Inverse of get_opt_sigma.
+    Inverse of get_sigma.
     '''
     if estimated_value == 0.0:
         return 0.0
@@ -191,7 +191,9 @@ def get_opt_privacy_allocation(epsilon, delta, stats_parameters,
     min_sigma_ratio = None
     max_sigma_ratio = None
     for param, (sensitivity, val) in stats_parameters.iteritems():
-        ratio = math.sqrt(excess_noise_ratio) * approx_sigmas[param] / val
+        ratio = get_expected_noise_ratio(excess_noise_ratio,
+                                         approx_sigmas[param],
+                                         val)
         if (min_sigma_ratio is None) or (ratio < min_sigma_ratio):
             min_sigma_ratio = ratio
         if (max_sigma_ratio is None) or (ratio > max_sigma_ratio):
@@ -207,7 +209,7 @@ def get_opt_privacy_allocation(epsilon, delta, stats_parameters,
     # turn opt sigma ratio into per-parameter sigmas
     opt_sigmas = dict()
     for param, (sensitivity, val) in stats_parameters.iteritems():
-        opt_sigma = get_opt_sigma(excess_noise_ratio, opt_sigma_ratio, val)
+        opt_sigma = get_sigma(excess_noise_ratio, opt_sigma_ratio, val)
         opt_sigmas[param] = opt_sigma
 
     return (opt_epsilons, opt_sigmas, opt_sigma_ratio)
