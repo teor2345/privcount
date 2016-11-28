@@ -17,7 +17,7 @@ from twisted.internet.protocol import ServerFactory
 
 from protocol import PrivCountServerProtocol
 from statistics_noise import get_noise_allocation
-from util import log_error, SecureCounters, generate_keypair, generate_cert, format_elapsed_time_since, format_elapsed_time_wait, format_delay_time_until, format_interval_time_between, format_last_event_time_since, normalise_path, counter_modulus, min_blinded_counter_value, max_blinded_counter_value, min_tally_counter_value, max_tally_counter_value, add_counter_limits_to_config, check_noise_weight_config, check_counters_config
+from util import log_error, SecureCounters, generate_keypair, generate_cert, format_elapsed_time_since, format_elapsed_time_wait, format_delay_time_until, format_interval_time_between, format_last_event_time_since, normalise_path, counter_modulus, min_blinded_counter_value, max_blinded_counter_value, min_tally_counter_value, max_tally_counter_value, add_counter_limits_to_config, check_noise_weight_config, check_counters_config, CollectionDelay
 
 import yaml
 
@@ -85,7 +85,12 @@ def log_tally_server_status(status):
             continue_str = "continue for {} more rounds".format(rem)
         else:
             continue_str = "continue indefinitely"
-        next_round_str = " as soon as clients are ready"
+        next_start_time = status['delay_until']
+        if next_start_time > time():
+            next_round_str = " in {}".format(format_delay_time_until(
+                                                 next_start_time, 'at'))
+        else:
+            next_round_str = " as soon as clients are ready"
     else:
         continue_str = "stop"
         next_round_str = " after this collection round"
@@ -109,6 +114,7 @@ class TallyServer(ServerFactory):
         self.collection_phase = None
         self.idle_time = time()
         self.num_completed_collection_phases = 0
+        self.collection_delay = CollectionDelay()
 
     def buildProtocol(self, addr):
         return PrivCountServerProtocol(self)
@@ -173,8 +179,14 @@ class TallyServer(ServerFactory):
                                    self.config['continue']):
                 dcs, sks = self.get_idle_dcs(), self.get_idle_sks()
                 if len(dcs) >= self.config['dc_threshold'] and len(sks) >= self.config['sk_threshold']:
-                    logging.info("starting collection phase {} with {} DataCollectors and {} ShareKeepers".format((num_phases+1), len(dcs), len(sks)))
-                    self.start_new_collection_phase(dcs, sks)
+                    if self.collection_delay.round_start_permitted(
+                                                 self.config['noise'],
+                                                 time(),
+                                                 self.config['delay_period']):
+                        # we've passed all the checks, start the collection
+                        num_phases = self.num_completed_collection_phases
+                        logging.info("starting collection phase {} with {} DataCollectors and {} ShareKeepers".format((num_phases+1), len(dcs), len(sks)))
+                        self.start_new_collection_phase(dcs, sks)
 
         # check if we should stop a running collection phase
         else:
@@ -298,6 +310,7 @@ class TallyServer(ServerFactory):
             # Set the default periods
             ts_conf.setdefault('event_period', 60)
             ts_conf.setdefault('checkin_period', 60)
+            ts_conf.setdefault('delay_period', ts_conf['collect_period'])
 
             # The event period should be less than or equal to half the
             # collect period, otherwise privcount sometimes takes an extra
@@ -327,6 +340,16 @@ class TallyServer(ServerFactory):
                 logging.info("checkin_period %d greater than event_period %d, client statuses might be delayed",
                              ts_conf['checkin_period'],
                              ts_conf['event_period'])
+
+            # The delay period must be greater than or equal to the collect
+            # period
+            delay_min = ts_conf['collect_period']
+            if (ts_conf['delay_period'] < delay_min):
+                logging.warning("delay_period %d too small for collect_period %d, increasing to %d",
+                                ts_conf['delay_period'],
+                                ts_conf['collect_period'],
+                                delay_min)
+                ts_conf['delay_period'] = delay_min
 
             assert ts_conf['listen_port'] > 0
             assert ts_conf['sk_threshold'] > 0
@@ -438,7 +461,10 @@ class TallyServer(ServerFactory):
             'sks_total' : sk_idle+sk_active,
             'sks_required' : self.config['sk_threshold'],
             'completed_phases' : self.num_completed_collection_phases,
-            'continue' : self.config['continue']
+            'continue' : self.config['continue'],
+            'delay_until' : self.collection_delay.get_next_round_start_time(
+                self.config['noise'],
+                self.config['delay_period'])
         }
 
         # we can't know the expected end time until we have started
@@ -536,8 +562,27 @@ class TallyServer(ServerFactory):
         self.collection_phase.set_tally_server_status(self.get_status())
         self.collection_phase.stop()
         if self.collection_phase.is_stopped():
+            # we want the end time after all clients have definitely stopped
+            # and returned their results, not the time the TS told the
+            # CollectionPhase to initiate the stop procedure
+            # (otherwise, a lost message or down client could delay stopping
+            # for a pathological period of time, breaking our assumptions)
+            # This also means that the SKs will allow the round to start
+            # slightly before the TS allows it, which is a good thing.
+            end_time = time()
             self.num_completed_collection_phases += 1
             self.collection_phase.write_results(self.config['results'])
+            self.collection_delay.set_stop_result(
+                # we can't use config['noise'], because it might have changed
+                # since the start of the round
+                self.collection_phase.get_noise_config(),
+                self.collection_phase.get_start_ts(),
+                end_time,
+                # if config['delay_period'] has changed, we use it, and warn
+                # if it would have made a difference
+                self.config['delay_period'],
+                not self.collection_phase.is_error()
+                )
             self.collection_phase = None
             self.idle_time = time()
 
@@ -745,6 +790,9 @@ class CollectionPhase(object):
 
     def is_stopped(self):
         return True if self.state == 'stopped' else False
+
+    def get_noise_config(self):
+        return self.noise_config
 
     def get_start_ts(self):
         return self.starting_ts
