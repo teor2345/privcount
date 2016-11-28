@@ -24,13 +24,40 @@ import yaml
 # for warning about logging function and format # pylint: disable=W1202
 # for calling methods on reactor # pylint: disable=E1101
 
+def get_remaining_rounds(num_phases, continue_config):
+        '''
+        If the TS is configured to continue collecting a limited number of
+        rounds, return the number of rounds. Otherwise, if it will continue
+        forever, return None.
+        '''
+        if num_phases == 0:
+            return 1
+        if isinstance(continue_config, bool):
+            if continue_config:
+                return None
+            else:
+                return 0
+        else:
+            return continue_config - num_phases
+
+def continue_collecting(num_phases, continue_config):
+        '''
+        If the TS is configured to continue collecting more rounds,
+        return True. Otherwise, return False.
+        '''
+        if num_phases == 0:
+            return True
+        if isinstance(continue_config, bool):
+            return continue_config
+        else:
+            return continue_config > num_phases
+
 def log_tally_server_status(status):
     '''
     clients must only use the expected end time for logging: the tally
     server may end the round early, or extend it slightly to allow for
     network round trip times
     '''
-
     # until the collection round starts, the tally server doesn't know when it
     # is expected to end
     expected_end_msg = ""
@@ -50,6 +77,22 @@ def log_tally_server_status(status):
     t, r = status['sks_total'], status['sks_required']
     a, i = status['sks_active'], status['sks_idle']
     logging.info("--server status: ShareKeepers: have {}, need {}, {}/{} active, {}/{} idle".format(t, r, a, t, i, t))
+    if continue_collecting(status['completed_phases'],
+                           status['continue']):
+        rem = get_remaining_rounds(status['completed_phases'],
+                                   status['continue'])
+        if rem is not None:
+            continue_str = "continue for {} more rounds".format(rem)
+        else:
+            continue_str = "continue indefinitely"
+        next_round_str = " as soon as clients are ready"
+    else:
+        continue_str = "stop"
+        next_round_str = " after this collection round"
+    logging.info("--server status: Rounds: completed {}, configured to {} collecting{}"
+                 .format(status['completed_phases'],
+                         continue_str,
+                         next_round_str))
 
 class TallyServer(ServerFactory):
     '''
@@ -113,6 +156,11 @@ class TallyServer(ServerFactory):
         reactor.run()
 
     def refresh_loop(self):
+        '''
+        Perform the TS event loop:
+        Refresh the config, check clients, check if we want to start or stop
+        collecting, and log a status update.
+        '''
         # make sure we have the latest config and counters
         self.refresh_config()
 
@@ -121,8 +169,8 @@ class TallyServer(ServerFactory):
 
         # check if we should start the next collection phase
         if self.collection_phase is None:
-            num_phases = self.num_completed_collection_phases
-            if num_phases == 0 or self.config['continue']:
+            if continue_collecting(self.num_completed_collection_phases,
+                                   self.config['continue']):
                 dcs, sks = self.get_idle_dcs(), self.get_idle_sks()
                 if len(dcs) >= self.config['dc_threshold'] and len(sks) >= self.config['sk_threshold']:
                     logging.info("starting collection phase {} with {} DataCollectors and {} ShareKeepers".format((num_phases+1), len(dcs), len(sks)))
@@ -289,7 +337,8 @@ class TallyServer(ServerFactory):
             assert ts_conf['collect_period'] > 0
             assert ts_conf['event_period'] > 0
             assert ts_conf['checkin_period'] > 0
-            assert ts_conf['continue'] == True or ts_conf['continue'] == False
+            assert (isinstance(ts_conf['continue'], bool) or
+                    ts_conf['continue'] >= 0)
             # check the hard-coded counter values are sane
             assert counter_modulus() > 0
             assert min_blinded_counter_value() == 0
@@ -387,7 +436,9 @@ class TallyServer(ServerFactory):
             'sks_idle' : sk_idle,
             'sks_active' : sk_active,
             'sks_total' : sk_idle+sk_active,
-            'sks_required' : self.config['sk_threshold']
+            'sks_required' : self.config['sk_threshold'],
+            'completed_phases' : self.num_completed_collection_phases,
+            'continue' : self.config['continue']
         }
 
         # we can't know the expected end time until we have started
