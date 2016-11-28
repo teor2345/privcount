@@ -923,11 +923,12 @@ class CollectionDelay(object):
         '''
         # there must be a configured delay (or a default must be used)
         assert delay is not None
+        # there must be a noise allocation for the next round
+        assert noise_allocation is not None
         if self.noise_change_needs_delay(self.starting_noise_allocation,
                                          noise_allocation):
-            # if there was a previous round, and we need to delay after it,
-            # there must have been an end time for that round
-            assert self.last_round_end_time
+            # if there was a change, there must have been a previous allocation
+            assert self.starting_noise_allocation
             # if there was a previous round, and we need to delay after it,
             # there must have been an end time for that round
             assert self.last_round_end_time
