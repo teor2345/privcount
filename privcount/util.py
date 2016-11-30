@@ -881,11 +881,11 @@ class CollectionDelay(object):
     TS: configures round
         uses get_next_round_start_time() for status updates
         checks round_start_permitted() before starting collection
+    TODO: DC: checks round_start_permitted() before sending blinding shares
     TODO: SK: checks round_start_permitted() before accepting blinding shares
-    TODO: DC also checks
     (round runs)
     TODO: SK: set_stop_result() when round stops and blinding shares are sent
-    TODO: DC also checks
+    TODO: DC: set_stop_result() when round stops and counters are sent
     TS: set_stop_result() when round ends successfully
     (repeat for next round, if TS has continue set in its config)
     '''
