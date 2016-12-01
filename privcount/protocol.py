@@ -1217,7 +1217,8 @@ class TorControlServerProtocol(LineOnlyReceiver):
             if parts[0] == "SETEVENTS":
                 # events are case-insensitive, so convert to uppercase
                 upper_setevents = map(str.upper, parts[1:])
-                upper_known_events = map(str.upper, get_privcount_events())
+                # already uppercase
+                upper_known_events = get_privcount_events()
                 # if every requested event is in the known events
                 # if there are no requested events, that's ok, it turns events
                 # off
