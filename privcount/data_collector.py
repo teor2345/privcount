@@ -10,7 +10,7 @@ from copy import deepcopy
 from base64 import b64decode
 
 from protocol import PrivCountClientProtocol, TorControlClientProtocol
-from counter import SecureCounters, counter_modulus, add_counter_limits_to_config, check_noise_weight_config, combine_counters
+from counter import SecureCounters, counter_modulus, add_counter_limits_to_config, combine_counters
 from util import log_error, get_public_digest_string, load_public_key_string, encrypt, format_delay_time_wait, format_last_event_time_since, normalise_path, choose_secret_handshake_path, PrivCountClient
 
 from twisted.internet import task, reactor, ssl
