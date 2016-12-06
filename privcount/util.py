@@ -28,6 +28,8 @@ from cryptography.hazmat.primitives import serialization, hashes, hmac
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.exceptions import UnsupportedAlgorithm, InvalidSignature
 
+from privcount.counter import check_counters_config
+
 def load_private_key_string(key_string):
     return serialization.load_pem_private_key(key_string, password=None, backend=default_backend())
 
