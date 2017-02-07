@@ -642,9 +642,9 @@ class Aggregator(ReconnectingClientFactory):
 
         # hand valid events off to the aggregator
         if event_code == 'PRIVCOUNT_STREAM_ENDED':
-            # 'PRIVCOUNT_STREAM_ENDED', ChanID, CircID, StreamID, ExitPort, ReadBW, WriteBW, TimeStart, TimeEnd, isDNS, isDir
-            if len(items) == 10:
-                self._handle_stream_event(items[0:10])
+            # 'PRIVCOUNT_STREAM_ENDED', ChanID, CircID, StreamID, ExitPort, ReadBW, WriteBW, TimeStart, TimeEnd, isDNS, isDir, remoteHostAddress, remoteIPAddress
+            if len(items) == 12:
+                self._handle_stream_event(items[0:12])
 
         elif event_code == 'PRIVCOUNT_CIRCUIT_ENDED':
             # 'PRIVCOUNT_CIRCUIT_ENDED', ChanID, CircID, nCellsIn, nCellsOut, ReadBWDNS, WriteBWDNS, ReadBWExit, WriteBWExit, TimeStart, TimeEnd, PrevIP, prevIsClient, prevIsRelay, NextIP, nextIsClient, nextIsRelay
@@ -663,6 +663,8 @@ class Aggregator(ReconnectingClientFactory):
         start, end = float(items[6]), float(items[7])
         is_dns = True if int(items[8]) == 1 else False
         is_dir = True if int(items[9]) == 1 else False
+        remote_host = items[10]
+        remote_ip = items[11]
 
         # only count streams with legitimate transfers
         totalbw = readbw+writebw
