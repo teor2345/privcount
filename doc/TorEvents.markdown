@@ -57,7 +57,7 @@ PrivEx's censorship blacklist measurements.
 It includes the following fields:
 * Channel ID
 * Circuit ID
-* Address requested by client (hostname or IPv4 or IPv6)
+* Requested Host Address (hostname or IPv4 or IPv6)
 
 It has the following known issues:
 * There is no indication in the event whether the request was successful or
@@ -144,6 +144,8 @@ It includes the following fields:
 * Current Timestamp
 * Is DNS Request Flag
 * Is Directory Request Flag
+* Remote Host Address (hostname or IPv4 or IPv6)
+* Resolved Remote IP Address (IPv4 or IPv6)
 
 It has the following known issues:
 * The is_dir flag has false positives on client connections to port 1  
