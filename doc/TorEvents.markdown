@@ -84,7 +84,8 @@ Client BEGINDIR (ORPort directory) requests trigger this event, but client
 HTTP (DirPort directory) requests do not.
 
 Relay DirPort self-checks by remote relays do trigger this event, even though
-they are not client traffic. The self-testing traffic and connections are
+they are not client traffic. The 
+traffic and connections are
 negligible compared with all tor network traffic, but may be significant for
 small counters that include IPv4 ports 80 or 9030.
 
@@ -126,7 +127,7 @@ Directory Request" flag, but client HTTP (DirPort directory) requests do not.
 
 Relay DirPort self-checks by remote relays do trigger this event, even though
 they are not client traffic. The self-testing traffic and connections are
-neglible compared with all tor network traffic, but may be significant for
+negligible compared with all tor network traffic, but may be significant for
 small counters that include IPv4 ports 80 or 9030.
 
 The end stream event is used by the PrivCount stream, circuit stream, and
@@ -165,7 +166,7 @@ HTTP (DirPort directory) requests do not.
 
 Relay DirPort self-checks by remote relays do trigger this event, even though
 they are not client traffic. The self-testing traffic and connections are
-neglible compared with all tor network traffic, but may be significant for
+negligible compared with all tor network traffic, but may be significant for
 small counters that include IPv4 ports 80 or 9030.
 
 The circuit ended event is used by the PrivCount circuit, circuit stream, and
@@ -212,7 +213,7 @@ event, including client BEGINDIR (ORPort directory) requests. But client
 HTTP (DirPort directory) requests do not.
 
 Relay DirPort self-checks by remote relays do trigger this event, even though
-they are not client traffic. The self-testing connections are neglible
+they are not client traffic. The self-testing connections are negligible
 compared with all tor network traffic: it is unlikely they would add many
 additional connections from middle to exit relays.
 
