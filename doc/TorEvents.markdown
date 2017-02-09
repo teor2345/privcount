@@ -8,29 +8,29 @@ Controller interfaces.
 
 ### Initialisation
 
-#### PrivCount authenticates to the Control Port (PROTOCOLINFO, AUTHENTICATE),
-     using one of the following methods:
-     * SAFECOOKIE (AUTHCHALLENGE)
-     * HASHEDPASSWORD
-     * NULL (if neither other method is available, and tor offers NULL
-       authentication)
+1. PrivCount authenticates to the Control Port (PROTOCOLINFO, AUTHENTICATE),
+   using one of the following methods:
+   * SAFECOOKIE (AUTHCHALLENGE)
+   * HASHEDPASSWORD
+   * NULL (if neither other method is available, and tor offers NULL
+     authentication)
 
-#### PrivCount discovers some relay information (GETINFO, GETCONF)
+2. PrivCount discovers some relay information (GETINFO, GETCONF)
 
 ### Collection
 
-#### PrivCount waits for the collection round to start
-#### PrivCount turns on the tor PrivCount code (SETCONF EnablePrivCount 1)
-#### PrivCount turns on the tor events required for the collection round
-     (SETEVENTS PRIVCOUNT_...)
-#### Tor starts sending events as they occur, and PrivCount processes these
-     events
+1. PrivCount waits for the collection round to start
+2. PrivCount turns on the tor PrivCount code (SETCONF EnablePrivCount 1)
+3. PrivCount turns on the tor events required for the collection round
+   (SETEVENTS PRIVCOUNT_...)
+4. Tor starts sending events as they occur, and PrivCount processes these
+   events
 
 ### Cleanup
 
-#### PrivCount waits for the collection round to stop
-#### PrivCount turns off EnablePrivCount and all tor events (SETCONF,
-     SETEVENTS)
+1. PrivCount waits for the collection round to stop
+2. PrivCount turns off EnablePrivCount and all tor events (SETCONF,
+   SETEVENTS)
 
 ## PrivCount Event Overview
 
@@ -43,7 +43,7 @@ This event is sent when an exit receives a client request, including:
 * both connect and resolve requests,
 * for DNS names, and IPv4 and IPv6 addresses,
 * whether the DNS name is in Tor's local DNS cache or not,
-* with limited checks on whether the address is a valid DNS name or IP address.
+* with limited checks on whether the address is a valid DNS name or IP address.  
   (Tor clients and Tor Exits perform some sanity checks before sending an
   address for resolution).
 
@@ -62,11 +62,11 @@ It includes the following fields:
 It has the following known issues:
 * There is no indication in the event whether the request was successful or
   not, so this event can not be used to count client connections (only client
-  requests).
+  requests)
   https://github.com/privcount/privcount/issues/184
-* The resolved address is not included in the event.
+* The resolved address is not included in the event
   https://github.com/privcount/privcount/issues/184
-* The time is not included in the event.
+* The time is not included in the event
   https://github.com/privcount/privcount/issues/187
 * These events include relay DirPort self-checks to their own IPv4 addresses
   https://github.com/privcount/privcount/issues/188
@@ -84,8 +84,9 @@ Client BEGINDIR (ORPort directory) requests trigger this event, but client
 HTTP (DirPort directory) requests do not.
 
 Relay DirPort self-checks by remote relays do trigger this event, even though
-they are not client traffic. The self-testing traffic and connections are
-neglible compared with all tor network traffic, but may be significant for
+they are not client traffic. The 
+traffic and connections are
+negligible compared with all tor network traffic, but may be significant for
 small counters that include IPv4 ports 80 or 9030.
 
 Some tor-side filtering of this event may be necessary for performance
@@ -126,7 +127,7 @@ Directory Request" flag, but client HTTP (DirPort directory) requests do not.
 
 Relay DirPort self-checks by remote relays do trigger this event, even though
 they are not client traffic. The self-testing traffic and connections are
-neglible compared with all tor network traffic, but may be significant for
+negligible compared with all tor network traffic, but may be significant for
 small counters that include IPv4 ports 80 or 9030.
 
 The end stream event is used by the PrivCount stream, circuit stream, and
@@ -165,7 +166,7 @@ HTTP (DirPort directory) requests do not.
 
 Relay DirPort self-checks by remote relays do trigger this event, even though
 they are not client traffic. The self-testing traffic and connections are
-neglible compared with all tor network traffic, but may be significant for
+negligible compared with all tor network traffic, but may be significant for
 small counters that include IPv4 ports 80 or 9030.
 
 The circuit ended event is used by the PrivCount circuit, circuit stream, and
@@ -212,7 +213,7 @@ event, including client BEGINDIR (ORPort directory) requests. But client
 HTTP (DirPort directory) requests do not.
 
 Relay DirPort self-checks by remote relays do trigger this event, even though
-they are not client traffic. The self-testing connections are neglible
+they are not client traffic. The self-testing connections are negligible
 compared with all tor network traffic: it is unlikely they would add many
 additional connections from middle to exit relays.
 
