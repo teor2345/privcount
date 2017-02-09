@@ -8,29 +8,29 @@ Controller interfaces.
 
 ### Initialisation
 
-#### PrivCount authenticates to the Control Port (PROTOCOLINFO, AUTHENTICATE),
-     using one of the following methods:
-     * SAFECOOKIE (AUTHCHALLENGE)
-     * HASHEDPASSWORD
-     * NULL (if neither other method is available, and tor offers NULL
-       authentication)
+1. PrivCount authenticates to the Control Port (PROTOCOLINFO, AUTHENTICATE),
+   using one of the following methods:
+   * SAFECOOKIE (AUTHCHALLENGE)
+   * HASHEDPASSWORD
+   * NULL (if neither other method is available, and tor offers NULL
+     authentication)
 
-#### PrivCount discovers some relay information (GETINFO, GETCONF)
+2. PrivCount discovers some relay information (GETINFO, GETCONF)
 
 ### Collection
 
-#### PrivCount waits for the collection round to start
-#### PrivCount turns on the tor PrivCount code (SETCONF EnablePrivCount 1)
-#### PrivCount turns on the tor events required for the collection round
-     (SETEVENTS PRIVCOUNT_...)
-#### Tor starts sending events as they occur, and PrivCount processes these
-     events
+1. PrivCount waits for the collection round to start
+2. PrivCount turns on the tor PrivCount code (SETCONF EnablePrivCount 1)
+3. PrivCount turns on the tor events required for the collection round
+   (SETEVENTS PRIVCOUNT_...)
+4. Tor starts sending events as they occur, and PrivCount processes these
+   events
 
 ### Cleanup
 
-#### PrivCount waits for the collection round to stop
-#### PrivCount turns off EnablePrivCount and all tor events (SETCONF,
-     SETEVENTS)
+1. PrivCount waits for the collection round to stop
+2. PrivCount turns off EnablePrivCount and all tor events (SETCONF,
+   SETEVENTS)
 
 ## PrivCount Event Overview
 
