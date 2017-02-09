@@ -43,7 +43,7 @@ This event is sent when an exit receives a client request, including:
 * both connect and resolve requests,
 * for DNS names, and IPv4 and IPv6 addresses,
 * whether the DNS name is in Tor's local DNS cache or not,
-* with limited checks on whether the address is a valid DNS name or IP address.
+* with limited checks on whether the address is a valid DNS name or IP address.  
   (Tor clients and Tor Exits perform some sanity checks before sending an
   address for resolution).
 
@@ -85,7 +85,7 @@ HTTP (DirPort directory) requests do not.
 
 Relay DirPort self-checks by remote relays do trigger this event, even though
 they are not client traffic. The self-testing traffic and connections are
-neglible compared with all tor network traffic, but may be significant for
+negligible compared with all tor network traffic, but may be significant for
 small counters that include IPv4 ports 80 or 9030.
 
 Some tor-side filtering of this event may be necessary for performance
