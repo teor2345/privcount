@@ -14,11 +14,9 @@ do
   case "$1" in
     --install|-I)
       PRIVCOUNT_INSTALL=1
-      PRIVCOUNT_DIRECTORY=$2
-      shift
       ;;
     --help|-h)
-      echo "usage: $0 [-I] [<privcount-directory>] -- [<data-source-args...>]"
+      echo "usage: $0 [...] [<privcount-directory>] -- [<data-source-args...>]"
       echo "  -I: run 'pip install -I <privcount-directory>' before testing"
       echo "    default: $PRIVCOUNT_INSTALL (1: install, 0: don't install) "
       echo "  <privcount-directory>: the directory privcount is in"
