@@ -45,9 +45,6 @@ do
       ;;
     *)
       PRIVCOUNT_DIRECTORY=$1
-      # leave any remaining arguments for the data source
-      shift
-      break
       ;;
   esac
   shift
