@@ -319,7 +319,7 @@ link_latest ts log
 link_latest sk log
 link_latest dc log
 for round_number in `seq $PRIVCOUNT_ROUNDS`; do
-  link_latest inject.$round_number log
+  link_latest $PRIVCOUNT_SOURCE.$round_number log
 done
 
 # Show the differences between the latest and old latest outcome files
