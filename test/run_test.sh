@@ -1,7 +1,13 @@
 #!/bin/bash
 
+# Shell settings
+# fail on failed commands or unset variables
 set -e
 set -u
+# the exit status of a pipe is the last non-zero exit, or zero if all succeed
+set -o pipefail
+# report background exit statuses immediately
+set -b
 
 # Default option values
 PRIVCOUNT_INSTALL=0
