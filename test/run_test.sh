@@ -257,7 +257,7 @@ while echo "$JOB_STATUS" | grep -q "Running"; do
       break
     fi
   fi
-  sleep 2
+  sleep 3
   JOB_STATUS=`jobs`
   echo "$JOB_STATUS"
 done
