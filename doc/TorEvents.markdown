@@ -49,8 +49,9 @@ HSDir    | Yes         | Yes     | Yes    | Yes  | Yes   | Onion Address+
 Intro    | Yes         | Yes     | No     | Yes  | Yes   | Service Keys+
 Rend     | Yes         | Yes     | No     | Yes  | Yes   | (None)
 
-\~ "Guard" relays can either be connected to clients, or to Bridge relays, and
-   can't tell the difference. Bridge relays know they are connected to clients.
+\~ "Guard" relays can be connected to clients, or Bridge relays, or other
+   relays that aren't in the consensus. Other relays authenticate using RSA and
+   ed25519 keys, bridges and clients do not, and can not be distinguished.
 \^ Application protocols also leak any unencrypted (meta)data to Exit relays.
 \* Directory requests contain information about the documents being downloaded.
    Clients request all relay documents, but fetch hidden service descriptors
