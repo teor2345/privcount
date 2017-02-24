@@ -575,6 +575,13 @@ grep -v -e NOTICE -e INFO -e DEBUG \
   -e "seconds of user activity" -e "delay_period not specified" \
   -e notice \
   -e "Path for PidFile" -e "Your log may contain" \
+  -e "Using Python" -e "Sending SIGINT to nodes" -e "Waiting for nodes to" \
+  -e "bootstrapping network:" -e NOTE -e "Creating identity key" \
+  -e "Starting nodes" -e "^\.*$" -e "is running with PID" \
+  -e "nodes are running" -e "for a consensus containing" \
+  -e "Verifying data transmission" -e "Connecting:" -e "Exit to" \
+  -e "Transmitting Data:" -e "Transmission: Success" \
+  -e "Removing stale lock file" \
   privcount.*.latest.log \
   || true
 # Log any source-specific warnings
