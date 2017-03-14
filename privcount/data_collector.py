@@ -304,6 +304,7 @@ class Aggregator(ReconnectingClientFactory):
         self.tor_control_port = tor_control_port
 
         self.last_event_time = 0.0
+        self.handled_event_count = 0
         self.num_rotations = 0L
         self.circ_info = {}
         self.strm_bytes = {}
@@ -641,6 +642,7 @@ class Aggregator(ReconnectingClientFactory):
             context['last_event_time'] = self.last_event_time
         if self.noise_weight_value is not None:
             context['noise_weight_value'] = self.noise_weight_value
+        context['handled_event_count'] = self.handled_event_count
         return context
 
     def handle_event(self, event):
@@ -653,6 +655,7 @@ class Aggregator(ReconnectingClientFactory):
 
         event_code, items = event[0], event[1:]
         self.last_event_time = time()
+        self.handled_event_count += 1
 
         # hand valid events off to the aggregator
         if event_code == 'PRIVCOUNT_STREAM_ENDED':
@@ -914,7 +917,10 @@ class Aggregator(ReconnectingClientFactory):
             self.secure_counters.increment("ConnectionLifeTime", end - start)
 
     def _do_rotate(self):
-        logging.info("rotating circuit window now, {}".format(format_last_event_time_since(self.last_event_time)))
+        logging.info("rotating circuit window now, {}"
+                     .format(format_last_event_time_since(
+                                 self.last_event_time,
+                                 self.handled_event_count)))
 
         # dont count anything in the first rotation period, since events that ended up in the
         # previous list will be skewed torward longer lived circuits

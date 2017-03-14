@@ -206,7 +206,7 @@ def format_interval_time_between(begin_timestamp, desc, end_timestamp):
     period = end_timestamp - begin_timestamp
     return format_interval(period, desc, begin_timestamp, end_timestamp)
 
-def format_last_event_time_since(last_event_timestamp):
+def format_last_event_time_since(last_event_timestamp, handled_event_count):
     '''
     Format the time elapsed since the last Tor event, and that event's time
     in UTC
@@ -218,7 +218,9 @@ def format_last_event_time_since(last_event_timestamp):
     last Tor event was 1w 3d 12h 20m 32s (at 2016-07-16 17:58:00 1468691880)
     '''
     if last_event_timestamp is None:
-        return "no Tor events received"
+        return "{} Tor events received".format(handled_event_count)
     else:
-        return "last Tor event was {}".format(format_elapsed_time_since(
-                                                  last_event_timestamp, 'at'))
+        return ("{} Tor events received, last event was {}"
+                .format(handled_event_count,
+                        format_elapsed_time_since(
+                            last_event_timestamp, 'at')))

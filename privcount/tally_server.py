@@ -521,10 +521,13 @@ class TallyServer(ServerFactory, PrivCountServer):
             self.clients[uid]['fingerprint'] = oldfingerprint
 
         last_event_time = status.get('last_event_time', None)
+        handled_event_count = status.get('handled_event_count', 0)
         last_event_message = ""
         # only log a message if we expect events
         if self.clients[uid]['type'] == 'DataCollector':
-            last_event_message = ' ' + format_last_event_time_since(last_event_time)
+            last_event_message = ' ' + format_last_event_time_since(
+                                           last_event_time,
+                                           handled_event_count)
         logging.info("----client status: {} {} is alive and {} for {}{}".format(self.clients[uid]['type'], uidname, self.clients[uid]['state'], format_elapsed_time_since(self.clients[uid]['time'], 'since'), last_event_message))
 
     def get_clock_padding(self, client_uids):
