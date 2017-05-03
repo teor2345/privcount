@@ -698,6 +698,7 @@ class Aggregator(ReconnectingClientFactory):
 
         self.strm_bytes.setdefault(strmid, {}).setdefault(circid, [])
         self.strm_bytes[strmid][circid].append([bw_bytes, is_outbound, ts])
+        return True
 
     STREAM_ENDED_ITEMS = 10
 
@@ -776,6 +777,7 @@ class Aggregator(ReconnectingClientFactory):
             self.strm_bytes[strmid].pop(circid, None)
             if len(self.strm_bytes[strmid]) == 0:
                 self.strm_bytes.pop(strmid, None)
+        return True
 
     def _classify_port(self, port):
         p2p_ports = [1214]
@@ -921,6 +923,7 @@ class Aggregator(ReconnectingClientFactory):
                 # if that was the last circuit on channel, remove the channel too
                 if len(self.circ_info[chanid]) == 0:
                     self.circ_info.pop(chanid, None)
+        return True
 
     CONNECTION_ENDED_ITEMS = 5
 
@@ -935,6 +938,7 @@ class Aggregator(ReconnectingClientFactory):
         if isclient:
             self.secure_counters.increment("ConnectionsAll", 1)
             self.secure_counters.increment("ConnectionLifeTime", end - start)
+        return True
 
     def _do_rotate(self):
         logging.info("rotating circuit window now, {}".format(format_last_event_time_since(self.last_event_time)))
