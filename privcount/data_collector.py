@@ -708,8 +708,8 @@ class Aggregator(ReconnectingClientFactory):
 
         chanid, circid, strmid, port, readbw, writebw = [int(v) for v in items[0:6]]
         start, end = float(items[6]), float(items[7])
-        remote_host = items[10]
-        remote_ip = items[11]
+        remote_host = items[8]
+        remote_ip = items[9]
 
         # only count streams with legitimate transfers
         totalbw = readbw+writebw
