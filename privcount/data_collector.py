@@ -920,9 +920,9 @@ class Aggregator(ReconnectingClientFactory):
                 if len(self.circ_info[chanid]) == 0:
                     self.circ_info.pop(chanid, None)
 
-    CONNECTION_ENDED_ITEMS = 6
+    CONNECTION_ENDED_ITEMS = 5
 
-    # 'PRIVCOUNT_CONNECTION_ENDED', ChanID, TimeStart, TimeEnd, IP, isClient, isRelay
+    # 'PRIVCOUNT_CONNECTION_ENDED', ChanID, TimeStart, TimeEnd, IP, isClient
     def _handle_connection_event(self, items):
         assert(len(items) == Aggregator.CONNECTION_ENDED_ITEMS)
 
@@ -930,8 +930,7 @@ class Aggregator(ReconnectingClientFactory):
         start, end = float(items[1]), float(items[2])
         ip = items[3]
         isclient = True if int(items[4]) > 0 else False
-        isrelay = True if int(items[5]) > 0 else False
-        if not isrelay:
+        if isclient:
             self.secure_counters.increment("ConnectionsAll", 1)
             self.secure_counters.increment("ConnectionLifeTime", end - start)
 
