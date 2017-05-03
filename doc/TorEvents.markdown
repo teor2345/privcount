@@ -313,7 +313,7 @@ The current unix epoch time (UTC) in seconds, to 6 decimal places. The
 underlying resolution depends on the operating system.
 
 ### Is Outbound Flag
-A string boolean flag: "outbound" for writes, "inbound" for reads.
+A numeric boolean flag: 1 for writes, 0 for reads.
 
 ### Is Client Flag
 A numeric boolean flag.
