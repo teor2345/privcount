@@ -458,7 +458,7 @@ case "$PRIVCOUNT_SOURCE" in
     privcount sk "$CONFIG" 2>&1 | `save_to_log . sk $LOG_TIMESTAMP` &
     popd
     # The chutney output is very verbose: don't save it to the log
-    $FIRST_ROUND_CMD 2>&1
+    $FIRST_ROUND_CMD 2>&1 &
     echo "For full chutney logs run $CHUTNEY_LOG_CMD" | \
         `save_to_log "$TEST_DIR" $PRIVCOUNT_SOURCE.$ROUNDS $LOG_TIMESTAMP`
     ;;
