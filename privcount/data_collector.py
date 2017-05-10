@@ -72,7 +72,7 @@ class DataCollector(ReconnectingClientFactory, PrivCountClient):
         '''
         Called by twisted
         '''
-        # load iniital config
+        # load initial config
         self.refresh_config()
         if self.config is None:
             logging.critical("cannot start due to error in config file")
@@ -100,6 +100,8 @@ class DataCollector(ReconnectingClientFactory, PrivCountClient):
         '''
         Called by protocol
         Refresh the config, and try to connect to the server
+        This function is usually called using callLater, so any exceptions
+        will be turned into log messages.
         '''
         # TODO: Refactor common client code - issue #121
         self.refresh_config()
@@ -188,6 +190,10 @@ class DataCollector(ReconnectingClientFactory, PrivCountClient):
         return shares
 
     def _start_aggregator_deferred(self):
+        '''
+        This function is called using callLater, so any exceptions will be
+        turned into log messages.
+        '''
         self.aggregator_defer_id = None
         self.aggregator.start()
 
@@ -943,6 +949,10 @@ class Aggregator(ReconnectingClientFactory):
         return True
 
     def _do_rotate(self):
+        '''
+        This function is called using LoopingCall, so any exceptions will be
+        turned into log messages.
+        '''
         logging.info("rotating circuit window now, {}".format(format_last_event_time_since(self.last_event_time)))
 
         # dont count anything in the first rotation period, since events that ended up in the
