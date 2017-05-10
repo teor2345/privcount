@@ -107,6 +107,8 @@ class PrivCountDataInjector(ServerFactory):
         Depending on the protocol, closing the connection can erase all unread
         data. So we stop sending events, but delay the actual close for a
         short amount of time.
+        This function sometimes reschedules itself using callLater: any
+        exceptions will be turned into log messages.
         '''
         if not self.injecting:
             logging.debug("Ignoring request to stop injecting when injection is not in progress")
@@ -180,6 +182,10 @@ class PrivCountDataInjector(ServerFactory):
             self.stop_injecting()
 
     def _flush_later(self, msg):
+        '''
+        This function is called using callLater, so any exceptions will be
+        turned into log messages.
+        '''
         self._flush_now(msg)
         self._inject_events()
 

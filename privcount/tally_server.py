@@ -101,6 +101,9 @@ class TallyServer(ServerFactory, PrivCountServer):
         Perform the TS event loop:
         Refresh the config, check clients, check if we want to start or stop
         collecting, and log a status update.
+        This function is called using LoopingCall, so any exceptions will be
+        turned into log messages. (This is the behaviour we want for malformed
+        config files.)
         '''
         # make sure we have the latest config and counters
         self.refresh_config()
