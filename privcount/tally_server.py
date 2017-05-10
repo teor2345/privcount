@@ -399,6 +399,14 @@ class TallyServer(ServerFactory, PrivCountServer):
 
     def clear_dead_clients(self):
         now = time()
+        is_stopping = False
+        if self.collection_phase is not None:
+            is_stopping = self.collection_phase.is_stopping()
+        warn_multiplier = 2
+        dead_multiplier = 6
+        if is_stopping:
+            warn_multiplier = 4
+            dead_multiplier = 8
 
         for uid in self.clients.keys():
             # don't print ShareKeepers' public keys, they're very long
@@ -407,12 +415,14 @@ class TallyServer(ServerFactory, PrivCountServer):
                 c_status['public_key'] = "(public key)"
             time_since_checkin = now - c_status['alive']
 
-            if time_since_checkin > 2 * self.get_checkin_period():
+            if (time_since_checkin
+                > warn_multiplier * self.get_checkin_period() + 5):
                 logging.warning("last checkin was {} for client {}".format(
                         format_elapsed_time_wait(time_since_checkin, 'at'),
                         c_status))
 
-            if time_since_checkin > 6 * self.get_checkin_period():
+            if (time_since_checkin
+                > dead_multiplier * self.get_checkin_period() + 5):
                 logging.warning("marking dead client {}".format(c_status))
                 c_status['state'] = 'dead'
 
@@ -803,6 +813,9 @@ class CollectionPhase(object):
 
     def is_error(self):
         return self.error_flag
+
+    def is_stopping(self):
+        return True if self.state == 'stopping' else False
 
     def is_stopped(self):
         return True if self.state == 'stopped' else False
