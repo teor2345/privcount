@@ -1134,6 +1134,8 @@ class SecureCounters(object):
             if 'bins' not in counter[key]:
                 return False
             num_bins = len(self.counters[key]['bins'])
+            if num_bins == 0:
+                return False
             if num_bins != len(counter[key]['bins']):
                 return False
             for i in xrange(num_bins):
