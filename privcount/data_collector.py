@@ -729,13 +729,13 @@ class Aggregator(ReconnectingClientFactory):
 
         self.circ_info.setdefault(chanid, {}).setdefault(circid, {'num_streams': {'interactive':0, 'web':0, 'p2p':0, 'other':0}, 'stream_starttimes': {'interactive':[], 'web':[], 'p2p':[], 'other':[]}})
 
-        stream_class = self._classify_port(port)
+        stream_class = Aggregator._classify_port(port)
         self.circ_info[chanid][circid]['num_streams'][stream_class] += 1
         self.circ_info[chanid][circid]['stream_starttimes'][stream_class].append(start)
 
         # the amount we read from the stream is bound for the client
         # the amount we write to the stream is bound to the server
-        ratio = self._encode_ratio(readbw, writebw)
+        ratio = Aggregator._encode_ratio(readbw, writebw)
         lifetime = end-start
 
         self.secure_counters.increment('ExitStreamCount', SINGLE_BIN)
@@ -790,7 +790,11 @@ class Aggregator(ReconnectingClientFactory):
                 self.strm_bytes.pop(strmid, None)
         return True
 
-    def _classify_port(self, port):
+    @staticmethod
+    def _classify_port(port):
+        '''
+        Classify port into web, interactive, p2p, or other.
+        '''
         p2p_ports = [1214]
         for p in xrange(4661, 4666+1): p2p_ports.append(p)
         for p in xrange(6346, 6429+1): p2p_ports.append(p)
@@ -806,7 +810,8 @@ class Aggregator(ReconnectingClientFactory):
         else:
             return 'other'
 
-    def _encode_ratio(self, inval, outval):
+    @staticmethod
+    def _encode_ratio(inval, outval):
         '''
         Calculate the log ratio between inbound and outbound traffic.
         Positive when outval > inval, and negative when inval > outval.
@@ -827,7 +832,12 @@ class Aggregator(ReconnectingClientFactory):
         else:
             return math.log(outval/inval, 2)
 
-    def _compute_interstream_creation_times(self, start_times):
+    @staticmethod
+    def _compute_interstream_creation_times(start_times):
+        '''
+        Sort start_times, and return a list of the differences between each
+        pair of times.
+        '''
         start_times.sort()
         isc_times = []
         for i in xrange(len(start_times)):
@@ -860,7 +870,7 @@ class Aggregator(ReconnectingClientFactory):
                 self.secure_counters.increment('EntryActiveCircuitCount', SINGLE_BIN)
                 self.secure_counters.increment('EntryCircuitInboundCellCount', ncellsin)
                 self.secure_counters.increment('EntryCircuitOutboundCellCount', ncellsout)
-                self.secure_counters.increment('EntryCircuitCellRatio', self._encode_ratio(ncellsin, ncellsout))
+                self.secure_counters.increment('EntryCircuitCellRatio', Aggregator._encode_ratio(ncellsin, ncellsout))
             else:
                 self.secure_counters.increment('EntryInactiveCircuitCount', SINGLE_BIN)
 
@@ -908,29 +918,29 @@ class Aggregator(ReconnectingClientFactory):
 
                 # first increment general counters
                 self.secure_counters.increment('ExitCircuitStreamCount', sum(counts.values()))
-                for isct in self._compute_interstream_creation_times(times['web'] + times['interactive'] + times['p2p'] + times['other']):
+                for isct in Aggregator._compute_interstream_creation_times(times['web'] + times['interactive'] + times['p2p'] + times['other']):
                     self.secure_counters.increment('ExitCircuitInterStreamCreationTime', isct)
 
                 # now only increment the classes that have positive counts
                 if counts['web'] > 0:
                     self.secure_counters.increment('ExitWebCircuitCount', SINGLE_BIN)
                     self.secure_counters.increment('ExitCircuitWebStreamCount', counts['web'])
-                    for isct in self._compute_interstream_creation_times(times['web']):
+                    for isct in Aggregator._compute_interstream_creation_times(times['web']):
                         self.secure_counters.increment('ExitCircuitWebInterStreamCreationTime', isct)
                 if counts['interactive'] > 0:
                     self.secure_counters.increment('ExitInteractiveCircuitCount', SINGLE_BIN)
                     self.secure_counters.increment('ExitCircuitInteractiveStreamCount', counts['interactive'])
-                    for isct in self._compute_interstream_creation_times(times['interactive']):
+                    for isct in Aggregator._compute_interstream_creation_times(times['interactive']):
                         self.secure_counters.increment('ExitCircuitInteractiveInterStreamCreationTime', isct)
                 if counts['p2p'] > 0:
                     self.secure_counters.increment('ExitP2PCircuitCount', SINGLE_BIN)
                     self.secure_counters.increment('ExitCircuitP2PStreamCount', counts['p2p'])
-                    for isct in self._compute_interstream_creation_times(times['p2p']):
+                    for isct in Aggregator._compute_interstream_creation_times(times['p2p']):
                         self.secure_counters.increment('ExitCircuitP2PInterStreamCreationTime', isct)
                 if counts['other'] > 0:
                     self.secure_counters.increment('ExitOtherPortCircuitCount', SINGLE_BIN)
                     self.secure_counters.increment('ExitCircuitOtherPortStreamCount', counts['other'])
-                    for isct in self._compute_interstream_creation_times(times['other']):
+                    for isct in Aggregator._compute_interstream_creation_times(times['other']):
                         self.secure_counters.increment('ExitCircuitOtherPortInterStreamCreationTime', isct)
 
             else:
