@@ -730,7 +730,7 @@ class Aggregator(ReconnectingClientFactory):
         lifetime = end-start
 
         self.secure_counters.increment('ExitStreamCount', 1)
-        self.secure_counters.increment('ExitStreamByteCount', 1, totalbw)
+        self.secure_counters.increment('ExitStreamByteCount', totalbw)
         self.secure_counters.increment('ExitStreamOutboundByteCount', writebw)
         self.secure_counters.increment('ExitStreamInboundByteCount', readbw)
         self.secure_counters.increment('ExitStreamByteRatio', ratio)
@@ -738,28 +738,28 @@ class Aggregator(ReconnectingClientFactory):
 
         if stream_class == 'web':
             self.secure_counters.increment('ExitWebStreamCount', 1)
-            self.secure_counters.increment('ExitWebStreamByteCount', 1, totalbw)
+            self.secure_counters.increment('ExitWebStreamByteCount', totalbw)
             self.secure_counters.increment('ExitWebStreamOutboundByteCount', writebw)
             self.secure_counters.increment('ExitWebStreamInboundByteCount', readbw)
             self.secure_counters.increment('ExitWebStreamByteRatio', ratio)
             self.secure_counters.increment('ExitWebStreamLifeTime', lifetime)
         elif stream_class == 'interactive':
             self.secure_counters.increment('ExitInteractiveStreamCount', 1)
-            self.secure_counters.increment('ExitInteractiveStreamByteCount', 1, totalbw)
+            self.secure_counters.increment('ExitInteractiveStreamByteCount', totalbw)
             self.secure_counters.increment('ExitInteractiveStreamOutboundByteCount', writebw)
             self.secure_counters.increment('ExitInteractiveStreamInboundByteCount', readbw)
             self.secure_counters.increment('ExitInteractiveStreamByteRatio', ratio)
             self.secure_counters.increment('ExitInteractiveStreamLifeTime', lifetime)
         elif stream_class == 'p2p':
             self.secure_counters.increment('ExitP2PStreamCount', 1)
-            self.secure_counters.increment('ExitP2PStreamByteCount', 1, totalbw)
+            self.secure_counters.increment('ExitP2PStreamByteCount', totalbw)
             self.secure_counters.increment('ExitP2PStreamOutboundByteCount', writebw)
             self.secure_counters.increment('ExitP2PStreamInboundByteCount', readbw)
             self.secure_counters.increment('ExitP2PStreamByteRatio', ratio)
             self.secure_counters.increment('ExitP2PStreamLifeTime', lifetime)
         elif stream_class == 'other':
             self.secure_counters.increment('ExitOtherPortStreamCount', 1)
-            self.secure_counters.increment('ExitOtherPortStreamByteCount', 1, totalbw)
+            self.secure_counters.increment('ExitOtherPortStreamByteCount', totalbw)
             self.secure_counters.increment('ExitOtherPortStreamOutboundByteCount', writebw)
             self.secure_counters.increment('ExitOtherPortStreamInboundByteCount', readbw)
             self.secure_counters.increment('ExitOtherPortStreamByteRatio', ratio)
