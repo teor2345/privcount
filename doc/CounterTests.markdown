@@ -33,7 +33,7 @@ README.
 
 To display all the bins for a counter, use:
     jq .Tally.CounterName.bins test/privcount.outcome.latest.json
-Where "CounterName" can be replaced by any PrivCount counter name.
+Where 'CounterName' can be replaced by any PrivCount counter name.
 
 More specific jq expressions are used in some tests to retrieve particular
 values. Expressions that need shell quoting are in double quotes.
@@ -44,7 +44,7 @@ unless otherwise indicated.
 ### Useful jq Expressions
 
 Extract the lower bound and count out of a histogram:
-    jq ".Tally.CounterName.bins|map([.[0,2]])"
+    jq '.Tally.CounterName.bins|map([.[0,2]])'
 
 ## Counter Tests
 
@@ -53,15 +53,15 @@ Every PrvivCount counter has at least one test in this section.
 
 ### Validity Check
 
-- ZeroCount: ".Tally.ZeroCount.bins[0][2] == 0"
+- ZeroCount: '.Tally.ZeroCount.bins[0][2] == 0'
     The ZeroCount is 0 in all valid outcome files.
 
 ### Exit Circuits
 
 - ExitCircuitCount:
-    ".Tally.ExitActiveCircuitCount.bins[0][2] +
+    '.Tally.ExitActiveCircuitCount.bins[0][2] +
      .Tally.ExitInactiveCircuitCount.bins[0][2] ==
-     .Tally.ExitCircuitCount.bins[0][2]"
+     .Tally.ExitCircuitCount.bins[0][2]'
     This is the sum of ExitActiveCircuitCount and ExitInactiveCircuitCount.
 
     There are approximately 3 exit circuits per chutney tor (including
@@ -70,7 +70,7 @@ Every PrvivCount counter has at least one test in this section.
     used, there is a short delay before another pre-emptive circuit is created
     to replace it.
 
-- ExitActiveCircuitCount: ".Tally.ExitActiveCircuitCount.bins[0][2] == 1"
+- ExitActiveCircuitCount: '.Tally.ExitActiveCircuitCount.bins[0][2] == 1'
     There is 1 active circuit per chutney Tor client. To add more active
     circuits, use a chutney flavour with more clients, or add more clients to
     chutney's basic-min. (chutney can also be modified to create a new
@@ -95,8 +95,8 @@ Every PrvivCount counter has at least one test in this section.
     (TODO: test other ports.)
 
 - ExitCircuitLifeTime:
-    "(.Tally.ExitCircuitLifeTime.bins|map(.[2])|add) ==
-      .Tally.ExitCircuitCount.bins[0][2]"
+    '(.Tally.ExitCircuitLifeTime.bins|map(.[2])|add) ==
+      .Tally.ExitCircuitCount.bins[0][2]'
     The sum of all the bins is equal to ExitCircuitCount. Typically, chutney
     runs for less than 2 minutes, so all circuit lifetimes are in the [0, 120)
     bin. To extend circuit lifetimes, change the PrivCount collect_period to
@@ -110,7 +110,7 @@ Every PrvivCount counter has at least one test in this section.
 
 ### Exit Streams
 
-- ExitStreamCount: ".Tally.ExitStreamCount.bins[0][2] == 1"
+- ExitStreamCount: '.Tally.ExitStreamCount.bins[0][2] == 1'
     There is 1 stream per chutney Tor client.
     To add more streams, use:
         run_test.sh ... -o 10
@@ -162,7 +162,7 @@ Every PrvivCount counter has at least one test in this section.
         run_test.sh ... -u 3 -b 70000000
     On my machine, sending 3 x 70 MB streams results in an [0,3) second time
     and a [3, 30) second time.
-    (See ExitStreamLifeTime for more info about increasing stream times.)
+    (To increase stream times, use the instructions under ExitStreamLifeTime.)
 
 - ExitCircuitInteractiveInterStreamCreationTime
 - ExitCircuitOtherPortInterStreamCreationTime
@@ -176,8 +176,10 @@ Every PrvivCount counter has at least one test in this section.
 
 ### Exit Bytes
 
-- ExitStreamByteCount: ".Tally.ExitStreamByteCount.bins[1][2] == 1"
-    The total count of all bins also matches the ExitStreamCount.
+- ExitStreamByteCount: '.Tally.ExitStreamByteCount.bins[1][2] == 1'
+    The total count of all bins matches the ExitStreamCount.
+    The byte count is the sum of the Inbound and Outbound byte counts, but
+    there is no simple formula, because the counts are binned.
     Use the instructions under:
       * ExitStreamLifeTime to change the number of bytes sent by chutney,
       * ExitStreamCount or ExitCircuitInterStreamCreationTime to change the
@@ -192,10 +194,10 @@ Every PrvivCount counter has at least one test in this section.
 - ExitWebStreamByteCount
     See the port variant notes under ExitInteractiveCircuitCount.
 
-- ExitStreamByteRatio: ".Tally.ExitStreamByteRatio.bins[-1][2] == 1"
+- ExitStreamByteRatio: '.Tally.ExitStreamByteRatio.bins[-1][2] == 1'
     The total count of all bins also matches the ExitStreamCount.
-    Chutney only sends (writes) bytes, so every stream will be in the highest
-    bin. (TODO: test reads and test zero writes.)
+    Chutney only sends Outbound bytes, so every stream will be in the highest
+    bin. (TODO: test Inbound bytes and test zero Outbound.)
 
 - ExitInteractiveStreamByteRatio
 - ExitOtherPortStreamByteRatio
@@ -204,6 +206,8 @@ Every PrvivCount counter has at least one test in this section.
     See the port variant notes under ExitInteractiveCircuitCount.
 
 - ExitStreamInboundByteCount
+    See the note under ExitStreamByteRatio that explains why this isn't tested.
+    (TODO: test Inbound bytes.)
 
 - ExitInteractiveStreamInboundByteCount
 - ExitOtherPortStreamInboundByteCount
@@ -212,6 +216,7 @@ Every PrvivCount counter has at least one test in this section.
     See the port variant notes under ExitInteractiveCircuitCount.
 
 - ExitStreamOutboundByteCount
+    Use the instructions under ExitStreamByteCount to change the byte count.
 
 - ExitInteractiveStreamOutboundByteCount
 - ExitOtherPortStreamOutboundByteCount
@@ -221,12 +226,59 @@ Every PrvivCount counter has at least one test in this section.
 
 ### Exit Traffic Model
 
-- ExitStreamTrafficModelEmissionCount
-
-- ExitStreamTrafficModelTransitionCount
+- ExitStreamTrafficModelEmissionCount:
+    '.Tally.ExitStreamTrafficModelEmissionCount.bins[0][2] == 1'
+    There is one Emission for every 1500 bytes (or non-zero remainder)
+    transmitted. Inbound and Outbound emissions are calculated separately.
+    Use the instructions under ExitStreamByteCount to change the byte count.
 
 - ExitStreamTrafficModelLogDelayTime
 - ExitStreamTrafficModelSquaredLogDelayTime
+    Delay times are calculated from Emissions using socket read/write
+    timestamps in a similar way to InterStreamCreationTimes. See the notes
+    under ExitCircuitInterStreamCreationTime for more details.
+
+    Typically, LogDelayTimes are small integers or zero (depending on your OS
+    timestamp resolution). If there is only one write, the SquaredLogDelayTime
+    will be the square of the LogDelayTime. Use the instructions under
+    ExitStreamLifeTime to increase the number of bytes sent: this will
+    increase the [Squared]LogDelayTime.
+
+- ExitStreamTrafficModelTransitionCount
+    '.Tally.ExitStreamTrafficModelTransitionCount.bins[0][2] == 0'
+    Transitions depend on the specific traffic model.
+    In the default test model, you need at least 2 Emissions (1501 bytes) to
+    have 1 Transition. See the instructions under ExitStreamByteCount for
+    changing the byte count.
+
+    Transitions from the START state are not counted in this total.
+
+#### Exit Traffic Model Template Counters
+
+- ExitStreamTrafficModelEmissionCount_<STATE>_<DIRECTION>:
+    '.Tally["ExitStreamTrafficModelEmissionCount_Thinking_+"].bins[0][2] == 1'
+    These counters sum to the ExitStreamTrafficModelEmissionCount.
+    See the notes under ExitStreamTrafficModelEmissionCount.
+
+- ExitStreamTrafficModelLogDelayTime_<STATE>_<DIRECTION>
+- ExitStreamTrafficModelSquaredLogDelayTime_<STATE>_<DIRECTION>
+    These counters sum to the ExitStreamTrafficModel[Squared]LogDelayTime.
+    See the notes under ExitStreamTrafficModelLogDelayTime.
+
+- ExitStreamTrafficModelTransitionCount_<SRCSTATE>_<DSTSTATE>
+    These counters sum to the ExitStreamTrafficModelTransitionCount.
+    See the notes under ExitStreamTrafficModelTransitionCount.
+
+    On my machine, for 1501 bytes, the transition is:
+    '.Tally.ExitStreamTrafficModelTransitionCount_Thinking_Blabbing.bins[0][2]
+     == 1'
+
+- ExitStreamTrafficModelTransitionCount_START_<STATE>:
+    '.Tally.ExitStreamTrafficModelTransitionCount_START_Thinking.bins[0][2] ==
+     1'
+    Transitions from the START state are not counted in
+    ExitStreamTrafficModelTransitionCount.
+    See the notes under ExitStreamTrafficModelTransitionCount.
 
 ### Entry Connections
 

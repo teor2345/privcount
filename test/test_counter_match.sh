@@ -74,9 +74,11 @@ done
 # Process the doc files
 doc="$TEST_DIR/../doc/CounterTests.markdown"
 OUT_PATH="$TEST_DIR/CounterTests.markdown"
-# the trailing colon is optional: it is used to delimit a test description
+# the trailing colon is optional: it is used to delimit a test expression
+# we ignore the template counters
 grep -i "^- $NAME_REGEX" "$doc" \
-    | cut -d' ' -f 2 | cut -d':' -f 1 | sort > "$OUT_PATH.names"
+    | cut -d' ' -f 2 | cut -d':' -f 1 | grep -v '_' \
+    | sort > "$OUT_PATH.names"
 
 echo "Number of counters:"
 wc -l "$TEST_DIR"/*.py.names "$TEST_DIR"/*.yaml.names \
