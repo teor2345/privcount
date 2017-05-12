@@ -73,6 +73,10 @@ The number of state transitions in the traffic model.
 ### TrafficModelLogDelayTime and TrafficModelSquaredLogDelayTime
 
 The (squared) natural logarithm of the inter-packet delay time in microseconds.
+These are derived from socket read/write timestamps, in a similar way to
+InterStreamCreationTimes. Each socket read/write is then split on 1500 byte
+boundaries into packets. The entire delay is assigned to the first packet in
+the socket read/write.
 
 Calculated using int(log(DelayTime)), with the following boundary
 conditions:
@@ -153,7 +157,8 @@ ExitStreamTrafficModelTransitionCount, but are counted in the
 ExitStreamTrafficModelTransitionCount_START_* counters.
 
 Emission and Delay counters use these qualifiers:
-* Thinking/Blabbing (Current State)
-* -/+ (Direction)
+* Thinking/Blabbing/End (Current State)
+* -/+/F (Direction)
 
-The Traffic Model counters use '-' for Inbound and '+' for Outbound.
+The Traffic Model counters use '-' for Inbound, '+' for Outbound, and 'F' for
+the End state.
