@@ -984,24 +984,34 @@ class Aggregator(ReconnectingClientFactory):
         '''
         logging.info("rotating circuit window now, {}".format(format_last_event_time_since(self.last_event_time)))
 
-        # dont count anything in the first rotation period, since events that ended up in the
-        # previous list will be skewed torward longer lived circuits
-        if True:#self.num_rotations > 0:
+        # don't count anything in the first rotation period, since events that ended up in the
+        # previous list will be skewed toward longer lived circuits
+        if self.num_rotations > 0:
+
+            client_ips_active = 0
+            client_ips_inactive = 0
+
+            # cli_ips_previous are the IPs from 2*period to period seconds ago,
+            # or are empty for the first rotation
             for ip in self.cli_ips_previous:
                 client = self.cli_ips_previous[ip]
 
-                self.secure_counters.increment('EntryClientIPCount', SINGLE_BIN)
                 if client['is_active']:
-                    self.secure_counters.increment('EntryActiveClientIPCount', SINGLE_BIN)
+                    client_ips_active += 1
                 else:
-                    self.secure_counters.increment('EntryInactiveClientIPCount', SINGLE_BIN)
+                    client_ips_inactive += 1
 
                 if 'num_active_completed' in client:
                     self.secure_counters.increment('EntryClientIPActiveCircuitCount', client['num_active_completed'])
                 if 'num_inactive_completed' in client:
                     self.secure_counters.increment('EntryClientIPInactiveCircuitCount', client['num_inactive_completed'])
 
+            self.secure_counters.increment('EntryClientIPCount', client_ips_active + client_ips_inactive)
+            self.secure_counters.increment('EntryActiveClientIPCount', client_ips_active)
+            self.secure_counters.increment('EntryInactiveClientIPCount', client_ips_inactive)
+
         # reset for next interval
+        # make cli_ips_previous the IPs from period to 0 seconds ago
         self.cli_ips_previous = self.cli_ips_current
         self.cli_ips_current = {}
         self.cli_ips_rotated = time()
