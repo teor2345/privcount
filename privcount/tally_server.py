@@ -422,8 +422,8 @@ class TallyServer(ServerFactory, PrivCountServer):
             # Maximum RTT in ~2005 was 20 seconds
             # http://www3.cs.stonybrook.edu/~phillipa/papers/SPECTS.pdf
             # There's no guarantee the last rtt will be the same as this one,
-            # so add a few seconds
-            rtt = client_status.get('rtt', 15.0) + 5.0
+            # so add a few seconds unconditionally
+            rtt = c_status.get('rtt', 15.0) + 5.0
 
             if time_since_checkin > 3 * self.get_checkin_period() + rtt:
                 logging.warning("last checkin was {} for client {}".format(
