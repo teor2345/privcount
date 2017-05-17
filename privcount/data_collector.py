@@ -1006,9 +1006,9 @@ class Aggregator(ReconnectingClientFactory):
                 if 'num_inactive_completed' in client:
                     self.secure_counters.increment('EntryClientIPInactiveCircuitCount', client['num_inactive_completed'])
 
-            self.secure_counters.increment('EntryClientIPCount', client_ips_active + client_ips_inactive)
-            self.secure_counters.increment('EntryActiveClientIPCount', client_ips_active)
-            self.secure_counters.increment('EntryInactiveClientIPCount', client_ips_inactive)
+            self.secure_counters.increment('EntryClientIPCount', SINGLE_BIN, client_ips_active + client_ips_inactive)
+            self.secure_counters.increment('EntryActiveClientIPCount', SINGLE_BIN, client_ips_active)
+            self.secure_counters.increment('EntryInactiveClientIPCount', SINGLE_BIN, client_ips_inactive)
 
         # reset for next interval
         # make cli_ips_previous the IPs from period to 0 seconds ago

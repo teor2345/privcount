@@ -274,27 +274,15 @@ counters:
     # ENTRY - unique client IPs seen with at least 8 cells transferred (10 min rotation)
     EntryActiveClientIPCount:
         bins:
-        - [0.0, 100.0]
-        - [100.0, 250.0]
-        - [250.0, 500.0]
-        - [500.0, 1000.0]
-        - [1000.0, .inf]
+        - [0.0, .inf]
     # ENTRY - unique client IPs seen with less than 8 cells transferred (10 min rotation)
     EntryInactiveClientIPCount:
         bins:
-        - [0.0, 100.0]
-        - [100.0, 250.0]
-        - [250.0, 500.0]
-        - [500.0, 1000.0]
-        - [1000.0, .inf]
+        - [0.0, .inf]
     # ENTRY - unique client IPs seen (10 min rotation)
     EntryClientIPCount:
         bins:
-        - [0.0, 100.0]
-        - [100.0, 250.0]
-        - [250.0, 500.0]
-        - [500.0, 1000.0]
-        - [1000.0, .inf]
+        - [0.0, .inf]
     # ENTRY - number of OR connections to clients
     EntryConnectionCount:
         bins:
