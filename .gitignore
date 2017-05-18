@@ -24,6 +24,8 @@ tor.pid
 # generated test keys and credentials
 test/keys/secret_handshake.yaml
 test/keys/control_password.txt
+test/keys/sk.pem
+test/keys/sk.cert
 test/keys/sk.*.pem
 test/keys/sk.sha256.list
 
