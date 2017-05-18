@@ -26,8 +26,9 @@ Some overheads are excluded:
 The number of unique Client IP addresses seen by the relay in each 10 minute
 interval.
 
-All ClientIP counters are rotated every 10 minutes to limit the number of
-Client IP addresses stored in memory.
+The IP addresses used in ClientIP counters are rotated every 10 minutes to
+limit the number of Client IP addresses stored in memory. It takes 2
+rotations for a Client IP address to be removed from memory.
 
 ### LifeTime
 
