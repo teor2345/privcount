@@ -305,23 +305,73 @@ counters:
     # EXIT - bytes received from server per completed stream
     ExitStreamInboundByteCount:
         bins:
-        - [-.inf, .inf]
+        - [0.0, 1.0]
+        - [1.0, 32768.0]
+        - [32768.0, 65536.0]
+        - [65536.0, 131072.0]
+        - [131072.0, 262144.0]
+        - [262144.0, 524288.0]
+        - [524288.0, 1048576.0]
+        - [1048576.0, 2097152.0]
+        - [2097152.0, 4194304.0]
+        - [4194304.0, 8388608.0]
+        - [8388608.0, .inf]
     # EXIT - bytes received from server per completed stream for IRC/SSH
     ExitInteractiveStreamInboundByteCount:
         bins:
-        - [-.inf, .inf]
+        - [0.0, 1.0]
+        - [1.0, 32768.0]
+        - [32768.0, 65536.0]
+        - [65536.0, 131072.0]
+        - [131072.0, 262144.0]
+        - [262144.0, 524288.0]
+        - [524288.0, 1048576.0]
+        - [1048576.0, 2097152.0]
+        - [2097152.0, 4194304.0]
+        - [4194304.0, 8388608.0]
+        - [8388608.0, .inf]
     # EXIT - bytes received from server per completed stream for port>=10000 and no other class
     ExitOtherPortStreamInboundByteCount:
         bins:
-        - [-.inf, .inf]
+        - [0.0, 1.0]
+        - [1.0, 32768.0]
+        - [32768.0, 65536.0]
+        - [65536.0, 131072.0]
+        - [131072.0, 262144.0]
+        - [262144.0, 524288.0]
+        - [524288.0, 1048576.0]
+        - [1048576.0, 2097152.0]
+        - [2097152.0, 4194304.0]
+        - [4194304.0, 8388608.0]
+        - [8388608.0, .inf]
     # EXIT - bytes received from server per completed stream for P2P
     ExitP2PStreamInboundByteCount:
         bins:
-        - [-.inf, .inf]
+        - [0.0, 1.0]
+        - [1.0, 32768.0]
+        - [32768.0, 65536.0]
+        - [65536.0, 131072.0]
+        - [131072.0, 262144.0]
+        - [262144.0, 524288.0]
+        - [524288.0, 1048576.0]
+        - [1048576.0, 2097152.0]
+        - [2097152.0, 4194304.0]
+        - [4194304.0, 8388608.0]
+        - [8388608.0, .inf]
     # EXIT - bytes received from server per completed stream for HTTP/HTTPS
     ExitWebStreamInboundByteCount:
         bins:
-        - [-.inf, .inf]
+        - [0.0, 1.0]
+        - [1.0, 32768.0]
+        - [32768.0, 65536.0]
+        - [65536.0, 131072.0]
+        - [131072.0, 262144.0]
+        - [262144.0, 524288.0]
+        - [524288.0, 1048576.0]
+        - [1048576.0, 2097152.0]
+        - [2097152.0, 4194304.0]
+        - [4194304.0, 8388608.0]
+        - [8388608.0, .inf]
     # EXIT - bytes received per completed stream for SSH/IRC
     ExitInteractiveStreamByteCount:
         bins:
@@ -333,23 +383,73 @@ counters:
     # EXIT - bytes sent to server per completed stream
     ExitStreamOutboundByteCount:
         bins:
-        - [-.inf, .inf]
+        - [0.0, 1.0]
+        - [1.0, 32768.0]
+        - [32768.0, 65536.0]
+        - [65536.0, 131072.0]
+        - [131072.0, 262144.0]
+        - [262144.0, 524288.0]
+        - [524288.0, 1048576.0]
+        - [1048576.0, 2097152.0]
+        - [2097152.0, 4194304.0]
+        - [4194304.0, 8388608.0]
+        - [8388608.0, .inf]
     # EXIT - bytes sent to server per completed stream for IRC/SSH
     ExitInteractiveStreamOutboundByteCount:
         bins:
-        - [-.inf, .inf]
+        - [0.0, 1.0]
+        - [1.0, 32768.0]
+        - [32768.0, 65536.0]
+        - [65536.0, 131072.0]
+        - [131072.0, 262144.0]
+        - [262144.0, 524288.0]
+        - [524288.0, 1048576.0]
+        - [1048576.0, 2097152.0]
+        - [2097152.0, 4194304.0]
+        - [4194304.0, 8388608.0]
+        - [8388608.0, .inf]
     # EXIT - bytes sent to server per completed stream for port>=10000 and no other class
     ExitOtherPortStreamOutboundByteCount:
         bins:
-        - [-.inf, .inf]
+        - [0.0, 1.0]
+        - [1.0, 32768.0]
+        - [32768.0, 65536.0]
+        - [65536.0, 131072.0]
+        - [131072.0, 262144.0]
+        - [262144.0, 524288.0]
+        - [524288.0, 1048576.0]
+        - [1048576.0, 2097152.0]
+        - [2097152.0, 4194304.0]
+        - [4194304.0, 8388608.0]
+        - [8388608.0, .inf]
     # EXIT - bytes sent to server per completed stream for P2P
     ExitP2PStreamOutboundByteCount:
         bins:
-        - [-.inf, .inf]
+        - [0.0, 1.0]
+        - [1.0, 32768.0]
+        - [32768.0, 65536.0]
+        - [65536.0, 131072.0]
+        - [131072.0, 262144.0]
+        - [262144.0, 524288.0]
+        - [524288.0, 1048576.0]
+        - [1048576.0, 2097152.0]
+        - [2097152.0, 4194304.0]
+        - [4194304.0, 8388608.0]
+        - [8388608.0, .inf]
     # EXIT - bytes sent to server per completed stream for HTTP/HTTPS
     ExitWebStreamOutboundByteCount:
         bins:
-        - [-.inf, .inf]
+        - [0.0, 1.0]
+        - [1.0, 32768.0]
+        - [32768.0, 65536.0]
+        - [65536.0, 131072.0]
+        - [131072.0, 262144.0]
+        - [262144.0, 524288.0]
+        - [524288.0, 1048576.0]
+        - [1048576.0, 2097152.0]
+        - [2097152.0, 4194304.0]
+        - [4194304.0, 8388608.0]
+        - [8388608.0, .inf]
     # EXIT - bytes received per completed stream for P2P
     ExitP2PStreamByteCount:
         bins:

@@ -183,17 +183,15 @@ Bins are half-open intervals, and use the notation [min, max).
 
 ### Exit Bytes
 
-- ExitStreamByteCount: '.Tally.ExitStreamByteCount.bins[1][2] == 1'
-    The total count of all bins matches the ExitStreamCount.
+- ExitStreamByteCount: '.Tally.ExitStreamByteCount.bins[0][2] == 10240'
     The byte count is the sum of the Inbound and Outbound byte counts, but
-    there is no simple formula, because the counts are binned.
+    there is no simple formula, because the Inbound and Outbound counts are
+    binned, but the ExitStreamByteCount is a single counter.
     Use the instructions under:
       * ExitStreamLifeTime to change the number of bytes sent by chutney,
       * ExitStreamCount or ExitCircuitInterStreamCreationTime to change the
         number of streams opened by chutney.
-    The ExitStreamByteCount is binned, so you will need to send at least 32768
-    bytes to see the bin counts change. Zero-byte requests are ignored by
-    chutney, so they can't be tested.
+    Zero-byte requests are ignored by chutney, so they can't be tested.
 
     TODO: send zero-byte requests.
 
@@ -214,8 +212,12 @@ Bins are half-open intervals, and use the notation [min, max).
 - ExitWebStreamInboundByteCount
     See the port variant notes under ExitInteractiveCircuitCount.
 
-- ExitStreamOutboundByteCount
+- ExitStreamOutboundByteCount:
+    '.Tally.ExitStreamOutboundByteCount.bins[1][2] == 1'
+    The total count of all bins matches the ExitStreamCount.
     Use the instructions under ExitStreamByteCount to change the byte count.
+    The ExitStreamOutboundByteCount is binned, so you will need to send at
+    least 32768 bytes to see the bin counts change.
 
 - ExitInteractiveStreamOutboundByteCount
 - ExitOtherPortStreamOutboundByteCount
