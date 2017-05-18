@@ -99,7 +99,6 @@ See doc/PrivCountAuthentication.markdown for more details.
 
 ## Tor Control Authentication
 
-
 PrivCount securely authenticates to tor's control port. This prevents the
 control port being used to run commands as the tor user.
 
