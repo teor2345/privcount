@@ -625,6 +625,7 @@ ENDSEC="`$TIMESTAMP_COMMAND`"
 # And terminate all the privcount processes
 echo "Terminating privcount and $PRIVCOUNT_SOURCE after $ROUNDS round(s)..."
 pkill -P $$
+wait
 
 # Symlink a timestamped file to a similarly-named "latest" file
 # Usage:
