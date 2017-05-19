@@ -25,22 +25,34 @@ See LICENSE for licensing information.
 
 Base components:
 
-    system libs:   libssl libssl-dev cffi
-    pip:           python-pip
-    source wheels: libpython2.7-dev
-    python libs:   pyyaml, twisted, pyopenssl, cryptography, ...
-                   (see requirements.txt for full list and versions)
+    Debian/Ubuntu:  libssl-dev libffi-dev
+    Other Linux:    libssl libssl-dev cffi
+
+    python libs:    pyyaml, twisted, pyopenssl, cryptography, ...
+                    (see requirements.txt for full list and versions)
 
     We require OpenSSL version 1.0.2 or later for SHA256-padded RSA encryption.
     Some tests require the openssl command.
 
+If building python libs from source:
+
+    Debian/Ubuntu:  libpython2.7-dev
+    Other Linux:    ?
+
+Optional python package manager:
+
+    Debian/Ubuntu:  python-pip
+    Other Linux:    ?
+
 Optional graphing extensions (required only for the `plot` subcommand):
 
-    system libs: libpng libpng-devel, #TODO this list is incomplete
-    python libs: numpy, matplotlib
-                 (see requirements-plot.txt for versions)
+    Debian/Ubuntu: libpng-dev          #TODO this list is incomplete
+    Other Linux:   libpng libpng-devel #TODO this list is incomplete
 
-Optional Tor consensus parsing tool:
+    python libs:   numpy, matplotlib
+                   (see requirements-plot.txt for versions)
+
+Optional Tor relay consensus weight tool:
 
     python libs: numpy, stem
                  (see requirements-weights.txt for versions)
