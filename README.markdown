@@ -26,6 +26,7 @@ See LICENSE for licensing information.
 Base components:
 
     system libs: libssl libssl-dev cffi
+    optional:    python-pip
     python libs: pyyaml, twisted, pyopenssl, service-identity, cryptography, ...
                  (see requirements.txt for full list and versions)
 
