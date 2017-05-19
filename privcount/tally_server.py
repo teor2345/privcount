@@ -854,8 +854,10 @@ class CollectionPhase(object):
             config['dc_threshold'] = self.dc_threshold_config
             config['defer_time'] = self.clock_padding
             config['collect_period'] = self.period
-            logging.info("sending start comand with {} counters and requesting {} shares to data collector {}"
+            logging.info("sending start comand with {} counters ({} bins) and requesting {} shares to data collector {}"
                          .format(len(config['counters']),
+                                 sum([len(counter_config['bins'])
+                                      for counter_config in config['counters'].values()]),
                                  len(config['sharekeepers']),
                                  client_uid))
             logging.debug("full data collector start config {}".format(config))
@@ -869,8 +871,10 @@ class CollectionPhase(object):
             config['noise_weight'] = self.noise_weight_config
             config['dc_threshold'] = self.dc_threshold_config
             config['collect_period'] = self.period
-            logging.info("sending start command with {} counters and {} shares to share keeper {}"
+            logging.info("sending start command with {} counters ({} bins) and {} shares to share keeper {}"
                          .format(len(config['counters']),
+                                 sum([len(counter_config['bins'])
+                                      for counter_config in config['counters'].values()]),
                                  len(config['shares']),
                                  client_uid))
             logging.debug("full share keeper start config {}".format(config))
