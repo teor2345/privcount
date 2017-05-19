@@ -550,8 +550,10 @@ for SK_NUM in `seq "$PRIVCOUNT_SHARE_KEEPERS"`; do
     sleep 1
   done
   echo ""
+  # Some versions of openssl dgst use (stdin)= before the hash, others don't
   "$PRIVCOUNT_OPENSSL" rsa -pubout < "$SK_KEY_PATH" \
-    | "$PRIVCOUNT_OPENSSL" dgst -sha256 | tr -d '\r\n' >> "$SK_LIST_FILE"
+    | "$PRIVCOUNT_OPENSSL" dgst -sha256 | cut -d" " -f2 | tr -d '\r\n' \
+    >> "$SK_LIST_FILE"
   echo "'" >> "$SK_LIST_FILE"
 done
 
