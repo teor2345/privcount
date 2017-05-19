@@ -26,7 +26,8 @@ See LICENSE for licensing information.
 Base components:
 
     system libs: libssl libssl-dev cffi
-    python libs: pyyaml, twisted, pyopenssl, service-identity, cryptography
+    python libs: pyyaml, twisted, pyopenssl, service-identity, cryptography, ...
+                 (see requirements.txt for full list and versions)
 
     We require OpenSSL version 1.0.2 or later for SHA256-padded RSA encryption.
     Some tests require the openssl command.
@@ -35,10 +36,12 @@ Optional graphing extensions (required only for the `plot` subcommand):
 
     system libs: libpng libpng-devel, #TODO this list is incomplete
     python libs: numpy, matplotlib
+                 (see requirements-plot.txt for versions)
 
 Optional Tor consensus parsing tool:
 
     python libs: numpy, stem
+                 (see requirements-weights.txt for versions)
 
 System libs can be install with `apt-get`, `yum`, `brew`, etc. Python libs can be installed with `pip`, as we explain below.
 
