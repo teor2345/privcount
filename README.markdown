@@ -25,10 +25,11 @@ See LICENSE for licensing information.
 
 Base components:
 
-    system libs: libssl libssl-dev cffi
-    optional:    python-pip
-    python libs: pyyaml, twisted, pyopenssl, service-identity, cryptography, ...
-                 (see requirements.txt for full list and versions)
+    system libs:   libssl libssl-dev cffi
+    pip:           python-pip
+    source wheels: libpython2.7-dev
+    python libs:   pyyaml, twisted, pyopenssl, cryptography, ...
+                   (see requirements.txt for full list and versions)
 
     We require OpenSSL version 1.0.2 or later for SHA256-padded RSA encryption.
     Some tests require the openssl command.
