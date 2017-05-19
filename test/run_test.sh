@@ -518,7 +518,7 @@ echo "Generating TS config from $TEMPLATE_CONFIG in $CONFIG..."
 template_to_config
 
 # launch the TS
-privcount ts "$CONFIG" 2>&1 | `save_to_log . ts $LOG_TIMESTAMP` &
+privcount ts "$CONFIG" 2>&1 | `save_to_log . ts "$LOG_TIMESTAMP"` &
 
 # launch enough SKs
 for SK_NUM in `seq "$PRIVCOUNT_SHARE_KEEPERS"`; do
@@ -527,7 +527,7 @@ for SK_NUM in `seq "$PRIVCOUNT_SHARE_KEEPERS"`; do
   template_to_config
 
   # Launch an SK with this config
-  privcount sk "$CONFIG" 2>&1 | `save_to_log . sk $LOG_TIMESTAMP` &
+  privcount sk "$CONFIG" 2>&1 | `save_to_log . "sk.$SK_NUM" "$LOG_TIMESTAMP"` &
 done
 
 # find the SK fingerprints
@@ -561,7 +561,8 @@ for DC_SOURCE_PORT in ${CHUTNEY_PORT_ARRAY[@]} ; do
   template_to_config
 
   # Launch a DC with this config
-  privcount dc "$CONFIG" 2>&1 | `save_to_log . dc $LOG_TIMESTAMP` &
+  privcount dc "$CONFIG" 2>&1 \
+      | `save_to_log . "dc.$DC_SOURCE_PORT" "$LOG_TIMESTAMP"` &
 done
 
 popd
@@ -629,32 +630,37 @@ wait
 
 # Symlink a timestamped file to a similarly-named "latest" file
 # Usage:
-# link_latest prefix suffix
-# Takes two arguments: the prefix and the suffix, in a filename like:
-# privcount.prefix.timestamp.suffix
+# link_latest prefix suffix [is_mandatory]
+# Takes three arguments: the prefix and the suffix, in a filename like:
+#     privcount.prefix.timestamp.suffix
+# and is_mandatory: if a file is mandatory, this function exits the script
+# if it is not found. is_mandatory defaults to true if not provided.
 # Doesn't handle arguments with spaces
 function link_latest() {
   PREFIX="$1"
   SUFFIX="$2"
+  IS_MANDATORY="${3:-1}"
   GLOB_PATTERN=privcount.$PREFIX.*.$SUFFIX
   LATEST_NAME=privcount.$PREFIX.latest.$SUFFIX
   pushd "$TEST_DIR" > /dev/null
   if [ -f $GLOB_PATTERN ]; then
     ln -s $GLOB_PATTERN "$LATEST_NAME"
-  else
+  elif [ "$IS_MANDATORY" -eq 1 ]; then
     echo "Error: No $PREFIX $SUFFIX file produced."
     exit 1
+  else
+    echo "Warning: No $PREFIX $SUFFIX file produced."
   fi
   popd > /dev/null
 }
 
-# If an outcome file was produced, keep a link to the latest file
+# If an outcome file was produced, link to the latest file
 link_latest outcome json
 
-# If a traffic model file was produced, keep a link to the latest file
-link_latest traffic.model json
+# If the optional traffic model file was produced, link to the latest file
+link_latest traffic.model json 0
 
-# If a tallies file was produced, keep a link to the latest file, and plot it
+# If a tallies file was produced, link to the latest file, and plot it
 link_latest tallies json
 if [ -f "$TEST_DIR/privcount.tallies.latest.json" -a \
     "$PRIVCOUNT_PLOT" -eq 1 ]; then
@@ -666,10 +672,17 @@ if [ -f "$TEST_DIR/privcount.tallies.latest.json" -a \
     echo "Plot failed. Install the dependencies in requirements-plot.txt to run plot."
 fi
 
-# If log files were produced, keep a link to the latest files
+# If log files were produced, link to the latest files
 link_latest ts log
-link_latest sk log
-link_latest dc log
+
+for SK_NUM in `seq "$PRIVCOUNT_SHARE_KEEPERS"`; do
+  link_latest "sk.$SK_NUM" log
+done
+
+for DC_SOURCE_PORT in ${CHUTNEY_PORT_ARRAY[@]} ; do
+  link_latest "dc.$DC_SOURCE_PORT" log
+done
+
 for round_number in `seq $PRIVCOUNT_ROUNDS`; do
   link_latest $PRIVCOUNT_SOURCE.$round_number log
 done
