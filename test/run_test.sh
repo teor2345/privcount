@@ -508,17 +508,17 @@ function template_to_config() {
   
   # This code must be kept in sync with the DC code
   # TS values
-  sed -i "" -e "s/PRIVCOUNT_SHARE_KEEPERS/$PRIVCOUNT_SHARE_KEEPERS/g" \
+  sed -i"" -e "s/PRIVCOUNT_SHARE_KEEPERS/$PRIVCOUNT_SHARE_KEEPERS/g" \
       "$CONFIG"
-  sed -i "" -e "s/DATA_COLLECTOR_COUNT/$DATA_COLLECTOR_COUNT/g" "$CONFIG"
+  sed -i"" -e "s/DATA_COLLECTOR_COUNT/$DATA_COLLECTOR_COUNT/g" "$CONFIG"
   
   # SK values
-  sed -i "" -e "s/SK_NUM/$SK_NUM/g" "$CONFIG"
+  sed -i"" -e "s/SK_NUM/$SK_NUM/g" "$CONFIG"
 
   # DC stub values
-  sed -i "" -e "s/DC_SOURCE_PORT/$DC_SOURCE_PORT/g" "$CONFIG"
-  sed -i "" -e "/- SK_LIST/r $SK_LIST_FILE" "$CONFIG"
-  sed -i "" -e "/- SK_LIST/d" "$CONFIG"
+  sed -i"" -e "s/DC_SOURCE_PORT/$DC_SOURCE_PORT/g" "$CONFIG"
+  sed -i"" -e "/- SK_LIST/r $SK_LIST_FILE" "$CONFIG"
+  sed -i"" -e "/- SK_LIST/d" "$CONFIG"
 }
 
 # this config makes the TS expect the right number of DCs and SKs
