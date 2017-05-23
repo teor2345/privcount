@@ -35,54 +35,67 @@ update PrivCountProtocol.HANDSHAKE_VERSION manually.
 The Tor and PrivCount versions will never clash, because the Tor version has
 a leading zero.
 
-# PrivCount Tor Patch
+# Git Repositories
+
+PrivCount consists of nodes implemented in python that securely aggregate Tor
+usage data.
 
 PrivCount obtains its Tor usage data via Tor Control Events. These events have
 been implemented specifically for PrivCount: they have not yet been merged into
 Tor master.
 
-## Development Branch
-
-The master branch for PrivCount development is called:
-
-    privcount
-
-Updates to this branch are force-pushed to keep it at the latest Tor version.
-
-## Other Branches
-
-Maintenance branches are created as-needed: they are versioned like Tor
-maintenance branches, but with a privcount prefix:
-
-    privcount-maint-1.0
-
-## Release Tags
-
-Release tags are created as-needed. They are named after the corresponding
-PrivCount release, and the corresponding Tor branch or tag.
-
 Since PrivCount uses [semantic versioning](http://semver.org), patch versions
 are always compatible, and minor versions are compatible *if* you don't use
 any new features.
 
-Examples:
+## Latest Stable Branch
 
-PrivCount Tor Tag            | Tor Tag      | PrivCount Python Compatibility
------------------------------|--------------|-------------------------------
-privcount-1.0.0-tor-0.3.0.7  | tor-0.3.0.7  | privcount-1.?.*
-privcount-1.0.0-tor-0.2.9.10 | tor-0.2.9.10 | privcount-1.?.*
-privcount-0.1.1-tor-0.2.7.6  | tor-0.2.7.6  | privcount-0.1.*
+The stable branch for PrivCount development is always called:
+
+    privcount
+
+In the Tor PrivCount repository, updates to this branch are force-pushed to
+keep it at a recent Tor version.
+
+## Maintenance Branches
+
+Maintenance branches are created as-needed.
+
+Maintenance branches for PrivCount (python) development look like:
+
+    maint-1.0
+
+Maintenance branches for Tor PrivCount have a privcount prefix and Tor version
+suffix:
+
+    privcount-maint-1.0-tor-0.3.0.7
+
+## Development Branch
+
+The master branch for PrivCount (python) development is called:
+
+    master
+
+The master branch for Tor PrivCount development is called:
+
+    privcount-master
+
+## Release Tags
+
+Release tags are created as-needed. They are named after the corresponding
+PrivCount release. Tor PrivCount tags have a suffix with the Tor branch or tag.
+
+Release tags look like:
+
+    privcount-1.0.0-tor-0.3.0.7
+    privcount-0.1.1-tor-0.2.7.6
 
 Avoid using Tor maint branches, but, if you must, tag it with the latest Tor
-minor version and a git commit hash.
+minor version and a git commit hash, like this:
 
-Example:
+    privcount-1.0.0-tor-0.2.9.10-a7bcab263
 
-PrivCount Tor Tag                      | Tor Upstream
----------------------------------------|-------------------------------
-privcount-1.0.0-tor-0.2.9.10-a7bcab263 | maint-0.2.9 (commit a7bcab263)
-
-## Rebasing onto the Latest Tor Version
+# Rebasing onto the Latest Tor Version
 
 Try to use the latest stable release whenever possible: avoid maint tags,
 because they change too often, and avoid outdated or alpha versions.

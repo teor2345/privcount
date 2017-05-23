@@ -21,9 +21,14 @@ Tariq Elahi, George Danezis, and Ian Goldberg
 
 See LICENSE for licensing information.
 
-# Dependencies
+# Building and Installing PrivCount
 
-## PrivCount requirements:
+Getting PrivCount:
+
+    git clone https://github.com/privcount/privcount.git
+    git checkout privcount
+
+## PrivCount depencencies:
 
     Debian/Ubuntu:  libssl-dev libffi-dev
     Other Linux:    libssl libssl-devel cffi
