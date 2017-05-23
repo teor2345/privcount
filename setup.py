@@ -10,8 +10,9 @@ See LICENSE for licensing information
 from distutils.core import setup
 
 setup(name='PrivCount',
-      version='0.2.0',
+      version='1.0.0',
       description='Safely gather and aggregate Tor statistics',
+      url='https://github.com/privcount',
       author='Rob Jansen',
       packages=['privcount'],
       scripts=['privcount/tools/privcount'],
