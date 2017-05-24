@@ -13,7 +13,7 @@ setup(name='PrivCount',
       version='1.0.0',
       description='Safely gather and aggregate Tor statistics',
       url='https://github.com/privcount',
-      author='Rob Jansen',
+      author='Rob Jansen, Tim Wilson-Brown',
       packages=['privcount'],
       scripts=['privcount/tools/privcount'],
       # allow other packages to depend on "privcount [plot]"

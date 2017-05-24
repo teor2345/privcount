@@ -9,6 +9,7 @@ publication:
 Safely Measuring Tor
 23rd ACM Conference on Computer and Communication Security (CCS 2016)
 Rob Jansen and Aaron Johnson
+http://www.robgjansen.com/publications/privcount-ccs2016.pdf
 ```
 
 For more information about PrivEx, see:
@@ -17,6 +18,7 @@ For more information about PrivEx, see:
 PrivEx: Private Collection of Traffic Statistics for Anonymous Communication Networks
 21st ACM Conference on Computer and Communications Security (CCS 2014)
 Tariq Elahi, George Danezis, and Ian Goldberg
+http://www.cypherpunks.ca/~iang/pubs/privex-ccs14.pdf
 ```
 
 See LICENSE for licensing information.
