@@ -141,29 +141,29 @@ def increment_counters(dc_list, N, multi_bin=True):
     assert N <= sys.maxint
     for _ in xrange(int(N)):
         # single bin
-        sc_dc.increment('ByteCount', SINGLE_BIN)
+        sc_dc.increment('ByteCount', bin_value=SINGLE_BIN, num_increments=1)
         # bin[0]
-        sc_dc.increment('ByteHistogram', -100.0)
+        sc_dc.increment('ByteHistogram', bin_value=-100.0, num_increments=1)
         if multi_bin:
-            sc_dc.increment('ByteHistogram', float('-inf'))
+            sc_dc.increment('ByteHistogram', bin_value=float('-inf'), num_increments=1)
         # no bin
-        sc_dc.increment('ByteHistogram', -5.0)
+        sc_dc.increment('ByteHistogram', bin_value=-5.0, num_increments=1)
         # bin[1]
-        sc_dc.increment('ByteHistogram', 0.0)
+        sc_dc.increment('ByteHistogram', bin_value=0.0, num_increments=1)
         if multi_bin:
-            sc_dc.increment('ByteHistogram', 511.0)
+            sc_dc.increment('ByteHistogram', bin_value=511.0, num_increments=1)
         # bin[2]
-        sc_dc.increment('ByteHistogram', 600.0)
+        sc_dc.increment('ByteHistogram', bin_value=600.0, num_increments=1)
         # bin[3]
         if multi_bin:
-            sc_dc.increment('ByteHistogram', 1024.0)
-        sc_dc.increment('ByteHistogram', 2047.0)
+            sc_dc.increment('ByteHistogram', bin_value=1024.0, num_increments=1)
+        sc_dc.increment('ByteHistogram', bin_value=2047.0, num_increments=1)
         # bin[4]
         pass
         # bin[5]
-        sc_dc.increment('ByteHistogram', float('inf'))
+        sc_dc.increment('ByteHistogram', bin_value=float('inf'), num_increments=1)
         if multi_bin:
-            sc_dc.increment('ByteHistogram', 10000.0)
+            sc_dc.increment('ByteHistogram', bin_value=10000.0, num_increments=1)
     return long(N)
 
 def increment_counters_num(dc_list, N, X=1L, multi_bin=True):
@@ -179,36 +179,36 @@ def increment_counters_num(dc_list, N, X=1L, multi_bin=True):
     assert N <= sys.maxint
     for _ in xrange(int(N)):
         # single bin
-        sc_dc.increment('ByteCount', SINGLE_BIN, 1.0)
-        sc_dc.increment('ByteCount', SINGLE_BIN, -1)
-        sc_dc.increment('ByteCount', SINGLE_BIN, long(X))
+        sc_dc.increment('ByteCount', bin_value=SINGLE_BIN, num_increments=1.0)
+        sc_dc.increment('ByteCount', bin_value=SINGLE_BIN, num_increments=-1)
+        sc_dc.increment('ByteCount', bin_value=SINGLE_BIN, num_increments=long(X))
         # bin[0]
-        sc_dc.increment('ByteHistogram', -100.0, long(X))
+        sc_dc.increment('ByteHistogram', bin_value=-100.0, num_increments=long(X))
         if multi_bin:
-            sc_dc.increment('ByteHistogram', float('-inf'), long(X))
+            sc_dc.increment('ByteHistogram', bin_value=float('-inf'), num_increments=long(X))
         # no bin
-        sc_dc.increment('ByteHistogram', -5.0, long(X))
+        sc_dc.increment('ByteHistogram', bin_value=-5.0, num_increments=long(X))
         # bin[1]
         # test that increment handles signed numbers, doubles & ints correctly
         # we can't rely on X being able to fit in a double or an int
         # so just increment by one, then subtract one
-        sc_dc.increment('ByteHistogram', 0.0, 1.0)
-        sc_dc.increment('ByteHistogram', 0.0, -1)
-        sc_dc.increment('ByteHistogram', 0.0, long(X))
+        sc_dc.increment('ByteHistogram', bin_value=0.0, num_increments=1.0)
+        sc_dc.increment('ByteHistogram', bin_value=0.0, num_increments=-1)
+        sc_dc.increment('ByteHistogram', bin_value=0.0, num_increments=long(X))
         if multi_bin:
-            sc_dc.increment('ByteHistogram', 511.0, long(X))
+            sc_dc.increment('ByteHistogram', bin_value=511.0, num_increments=long(X))
         # bin[2]
-        sc_dc.increment('ByteHistogram', 600.0, long(X))
+        sc_dc.increment('ByteHistogram', bin_value=600.0, num_increments=long(X))
         # bin[3]
         if multi_bin:
-            sc_dc.increment('ByteHistogram', 1024.0, long(X))
-        sc_dc.increment('ByteHistogram', 2047.0, long(X))
+            sc_dc.increment('ByteHistogram', bin_value=1024.0, num_increments=long(X))
+        sc_dc.increment('ByteHistogram', bin_value=2047.0, num_increments=long(X))
         # bin[4]
         pass
         # bin[5]
-        sc_dc.increment('ByteHistogram', float('inf'), long(X))
+        sc_dc.increment('ByteHistogram', bin_value=float('inf'), num_increments=long(X))
         if multi_bin:
-            sc_dc.increment('ByteHistogram', 10000.0, long(X))
+            sc_dc.increment('ByteHistogram', bin_value=10000.0, num_increments=long(X))
     return long(N)*long(X)
 
 def sum_counters(counters, modulus, dc_list, sk_list):
