@@ -346,13 +346,17 @@ class TrafficModel(object):
           secure_counters: the SecureCounters object whose counters should get incremented
             as a result of the observed bytes events
         '''
-        algo_start_time = clock()
+        packet_start_time = clock()
 
         # turn the bytes events into 'packet' events, and compute delay between packets
         observed_packet_delays = self._get_inter_packet_delays(strm_start_ts, byte_events)
 
+        viterbi_start_time = clock()
+
         # get the likliest path through our model given the observed delays
         likliest_states = self.run_viterbi(observed_packet_delays)
+
+        counter_start_time = clock()
 
         # do some sanity checks
         num_packets = len(observed_packet_delays)
@@ -429,11 +433,17 @@ class TrafficModel(object):
                                           inc=1)
 
         algo_end_time = clock()
-        processing_time = algo_end_time - algo_start_time
-        if processing_time > TrafficModel.MAX_STREAM_PROCESSING_TIME:
-          logging.warning("Long stream processing time: {:.3f} seconds to process {} packets exceeds limit of {:.3f} seconds."
-                          .format(processing_time, num_packets,
-                                  TrafficModel.MAX_STREAM_PROCESSING_TIME))
+        algo_elapsed = algo_end_time - packet_start_time
+        packet_elapsed = viterbi_start_time - packet_start_time
+        viterbi_elapsed = counter_start_time - viterbi_start_time
+        counter_elapsed = algo_end_time - counter_start_time
+
+        if algo_elapsed > TrafficModel.MAX_STREAM_PROCESSING_TIME:
+          logging.warning("Long stream processing time: {:.3f} seconds to process {} packets exceeds limit of {:.3f} seconds. Breakdown: packet {:.3f} viterbi {:.3f} counter {:.3f}."
+                          .format(algo_elapsed, num_packets,
+                                  TrafficModel.MAX_STREAM_PROCESSING_TIME,
+                                  packet_elapsed, viterbi_elapsed,
+                                  counter_elapsed))
 
     def update_from_tallies(self, tallies, trans_inertia=0.1, emit_inertia=0.1):
         '''
