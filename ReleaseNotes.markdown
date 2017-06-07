@@ -61,6 +61,9 @@ The versions of the PrivCount Tor Patch released with PrivCount 1.2.0 are:
 Features:
 * Add HSDir[3], Intro, and Rend to the position weights script #289
 
+Testing:
+* Check all events are tested and documented when running tests #347
+
 A full list of issues resolved is available at:
 https://github.com/privcount/privcount/milestone/9?closed=1
 
