@@ -64,6 +64,9 @@ Features:
 Accuracy:
 * Stop filtering BadExits from non-exit positions in the weights script #346
 
+Testing:
+* Check all events are tested and documented when running tests #347
+
 A full list of issues resolved is available at:
 https://github.com/privcount/privcount/milestone/9?closed=1
 
