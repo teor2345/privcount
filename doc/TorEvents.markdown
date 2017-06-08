@@ -50,7 +50,7 @@ Middle   | N/C         | N/C     | N/E    | N/C  | N/C/E& |
 Exit     | Y           | Y       | Y      | Y    | Y      | DNS^
 DirPort  | N/C         | N/A     | N/A    | N/A  | N/C    | URL*, Client IP$
 BEGINDIR | N/C         | N/C     | N/C    | N/C  | N/C    | URL*, Client IP$
-HSDir    | N/C         | N/C     | N/C    | N/C  | N/C    | Onion Address+
+HSDir    | N/C         | N/C     | N/C    | N/C  | N/C    | HS Descriptor+
 Intro    | Y           | Y       | N/E    | Y    | N/C/E& | Service Keys+
 Rend     | Y           | Y       | N/C    | Y    | N/C/E& |
 Client@  | N/C         | N/C     | N/C    | N/C  | N/C    | DNS^
@@ -95,8 +95,7 @@ included in each "bytes" event.
 
 ## PrivCount Events
 
-PrivCount implements the following events, listed in the typical order they
-would occur for a single client connection.
+PrivCount implements the following events.
 
 PrivCount tries to capture all non-directory Tor network traffic for its
 traffic modelling. Some other events are issued selectively based on the type
@@ -123,6 +122,9 @@ do not use DNS resolution, so they do not trigger this event.
 
 The DNS event is *not* used by any PrivCount counters, but was used as part of
 PrivEx's censorship blacklist measurements.
+
+This event has positional fields: order is important. Fields must not be added
+or removed from this event: that would break client code.
 
 It includes the following fields:
 * Channel ID
@@ -162,6 +164,9 @@ The bytes event is used by the PrivCount traffic model counters. (Other
 counters that report bytes use the same data as this event, but aggregate it,
 and send the totals with the END event.)
 
+This event has positional fields: order is important. Fields must not be added
+or removed from this event: that would break client code.
+
 It includes the following fields:
 * Channel ID (if the OR channel has not been cleared)
 * Circuit ID (if there is a corresponding OR circuit)
@@ -196,6 +201,9 @@ small counters that include IPv4 ports 80 or 9030.
 
 The end stream event is used by the PrivCount stream, circuit stream, and
 circuit activity counters.
+
+This event has positional fields: order is important. Fields must not be added
+or removed from this event: that would break client code.
 
 It includes the following fields:
 * Channel ID (if the OR channel has not been cleared)
@@ -234,6 +242,9 @@ small counters that include IPv4 ports 80 or 9030.
 
 The circuit ended event is used by the PrivCount circuit, circuit stream, and
 circuit activity counters.
+
+This event has positional fields: order is important. Fields must not be added
+or removed from this event: that would break client code.
 
 It includes the following fields:
 * Channel ID (if the OR channel has not been cleared)
@@ -282,6 +293,9 @@ excluding them makes connection counts more accurate.)
 The connection ended event is used by the PrivCount connection and connection
 lifetime counters.
 
+This event has positional fields: order is important. Fields must not be added
+or removed from this event: that would break client code.
+
 It includes the following fields:
 * Channel ID (if the OR channel has not been cleared)
 * Connection Creation Timestamp
@@ -299,7 +313,72 @@ It has the following known issues:
 * PrivCount's additional RAM allocations may affect Tor's connection limits
   https://github.com/privcount/privcount/issues/349
 
+### PRIVCOUNT_HSDIR_CACHE_STORED
+
+This event is sent when tor attempts to parse and store an onion service
+descriptor. Any attempt to upload a service descriptor triggers this event,
+even if the descriptor was unparseable or not cached (see FailureReasonString).
+
+Onion Services are also known as Hidden Services.
+
+Service descriptor versions 2 and 3 are supported
+(see HiddenServiceVersionNumber). Version 3 has not been tested, because a
+full service implementation is not available.
+
+This event does NOT include the onion address: instead, it includes the
+alternate identifiers DescriptorId (v2) or BlindedEd25519PublicKey (v3). The
+number of identifiers per service differs between versions 2 and 3.
+
+This event has tagged fields: order may vary, fields may be optional. Optional
+fields in current versions may be removed in future versions.
+
+It includes the following fields:
+
+Mandatory:
+* HiddenServiceVersionNumber
+* EventTimestamp
+
+Optional:
+* HasExistingCacheEntryFlag (present if the descriptor was parsed successfully)
+* WasAddedToCacheFlag
+* FailureReasonString (present if the descriptor was not added to the cache)
+* EncodedIntroPointByteCount (present if descriptor was parsed successfully)
+* EncodedDescriptorByteCount (may be zero)
+
+Optional in v2, Not Available in v3:
+* OnionAddress
+* DescriptorIdBase32String (not yet implemented in v3)
+* DescriptorCreationTime
+* SupportedProtocolBitfield
+* RequiresClientAuthFlag
+* IntroPointCount (missing if using client auth, or parsing failed)
+
+Optional in v3, Not Available in v2:
+* BlindedEd25519PublicKeyBase64String
+* RevisionNumber
+* DescriptorLifetime
+
+It has the following known issues:
+* PrivCount's additional RAM allocations may affect Tor's HSDir cache
+  https://github.com/privcount/privcount/issues/349
+
 ## PrivCount Event Field Detail
+
+Positional fields are a space-separated list of Data items. Fields MUST be
+located using their positions. Data MUST NOT contain spaces, newlines
+(C '\r' or '\n'), or NUL characters (C '\0'). Data SHOULD be encoded using
+printable characters. New fields MUST NOT be added to existing events: this
+breaks older clients.
+
+Tagged fields are a space separated list of Name=Data pairs. Fields MUST be
+located using their tag. Field positions MAY vary when other fields are
+optional, or when new fields are added in later PrivCount versions. Name and
+Data MUST NOT contain spaces, equals signs, newlines (C '\r' or '\n'), or NUL
+characters (C '\0'). Name SHOULD be a CamelCase ASCII identifier. Data SHOULD
+be encoded using printable characters. New fields SHOULD be added to the end
+of existing events, so that parsers that assume event order still work. Old
+fields SHOULD NOT be removed, so that parsers that assume event presence still
+work.
 
 ### Channel ID
 
@@ -318,6 +397,8 @@ An unsigned 16-bit unique identifier of a stream on a particular circuit.
 A string that represents the location of a remote site on the Internet. This
 may be a hostname, IPv4 address, or IPv6 address.
 
+Some parts of the hidden service protocol also use OnionAddresses.
+
 ### Port
 An unsigned 16-bit number that represents the port of a remote site on the
 Internet.
@@ -331,11 +412,18 @@ saturating arithmetic: values that exceed the maximum are reported as the
 maximum value.
 
 ### Timestamp
-The current unix epoch time (UTC) in seconds, to microsecond precision
+A unix epoch time (UTC) in seconds, to microsecond precision
 (6 decimal places). The underlying resolution depends on the operating system.
 
 Creation timestamps will always be after the last time PrivCount was enabled,
 to avoid capturing incomplete events.
+
+### Time
+A unix epoch time (UTC) in seconds, to integer precision (no decimal places).
+
+### Lifetime
+The duration of an event or status in seconds, to integer precision
+(no decimal places).
 
 ### Is Outbound Flag
 A numeric boolean flag: 1 for writes, 0 for reads.
@@ -361,3 +449,156 @@ False (0) if:
 * all streams are non-exit connections,
 * the next channel is connected to a relay,
 * the circuit and connection are both missing.
+
+### HiddenServiceVersionNumber
+An integer giving the hidden service (HS) version. Current versions are:
+* HSv2: Legacy hidden services. Supported by all current Tor versions.
+* HSv3: Next-generation hidden services. Partially implemented and deployed.
+
+Hidden services are also known as onion services.
+This field is named after the HiddenServiceVersion torrc option.
+
+### HasExistingCacheEntryFlag
+A numeric boolean flag.
+True (1) if:
+* the DescriptorId (v2) or BlindedEd25519PublicKey (v3) was already in the
+  cache.
+False (0) if:
+* the Id or Key was not in the cache.
+Unknown (missing) if:
+* the descriptor was unparseable.
+
+PrivCount's additional RAM allocations may affect cache behaviour.
+
+### WasAddedToCacheFlag
+A numeric boolean flag.
+True (1) if:
+* the descriptor was added to the cache.
+False (0) if:
+* the descriptor was not added to the cache, or
+* the descriptor was unparseable.
+
+PrivCount's additional RAM allocations may affect cache behaviour.
+
+### FailureReasonString
+An ASCII string that describes why the descriptor was not added to the cache:
+* obsolete: the DescriptorCreationTime was less than (v2) or
+            RevisionNumber (v3) was less than or equal to the corresponding
+            field in the descriptor that is already cached.
+* unparseable: the descriptor could not be parsed (v2 and v3). Empty uploads
+               are considered unparseable.
+* expired: the DescriptorCreationTime is more than 3 days old (v2 only).
+* future: the DescriptorCreationTime is more than 1 day into the future
+          (v2 only).
+* duplicate: the encoded descriptor body is identical to the encoded body for
+             the currently cached descriptor (v2 only).
+
+PrivCount's additional RAM allocations may affect cache behaviour.
+
+### OnionAddress
+A string containing the service id or onion address (without ".onion").
+
+This is a 16-character base32-encoded string, containing the first 10 bytes of
+the SHA1 hash of the service's RSA public key.
+
+The onion address is missing if the descriptor is unparseable, or the RSA
+public key is malformed.
+
+### DescriptorIdBase32String
+A string containing the base-32 encoded descriptor id, a unique identifier for
+the descriptor.
+
+This is *not* the v2 onion address.
+
+In v2, there is one DescriptorId per service address, per replica (x2),
+per day for descriptors that use no authentication and basic authentication.
+
+For v2 stealth authentication, each client key has a different DescriptorId,
+per service address, per replica, per day.
+
+Not yet implemented in v3.
+
+For details, see:
+https://gitweb.torproject.org/torspec.git/tree/rend-spec.txt#n218
+
+### BlindedEd25519PublicKeyBase64String
+A string containing the base-64 encoded blinded ed25519 public key, a unique
+daily identifier for a service's descriptors (v3 only).
+
+There is one BlindedEd25519PublicKey per service address, per day
+(or hsdir-interval consensus parameter).
+
+For details, see:
+https://gitweb.torproject.org/torspec.git/tree/proposals/224-rend-spec-ng.txt#n927
+
+### DescriptorCreationTime
+The time that a descriptor was signed by the service. This is a unix epoch
+time (UTC) in seconds, to integer precision (no decimal places). (v2 only.)
+
+### RequiresClientAuthFlag
+A numeric boolean flag (v2 only).
+True (1) if:
+* the introduction point section of the descriptor is encrypted (HSDirs can
+  not distinguish between encrypted and malformed intro point sections).
+False (0) if:
+* the intro point section in the descriptor was successfully parsed, and the
+  number of intro points was valid, or
+* there is no intro point section in the descriptor
+Unknown (missing) if:
+* the descriptor was unparseable.
+
+Since the same encryption scheme is used for basic and stealth auth, HSDirs
+can not tell the difference between them.
+
+### SupportedProtocolBitfield
+A hexadecimal number (prefixed with 0x) representing a bitfield of supported
+introduction protocols (v2 only).
+
+This is not the same as HiddenServiceVersionNumber.
+
+All current Tor versions advertise and support:
+* Intro version 2: no client authentication
+* Intro version 3: adds basic and stealth client authentication
+The equivalent bitfield value is 0x000c.
+
+Protocol versions 0 and 1 are no longer supported.
+
+This field is currently 16 bits. Tor supports generating descriptors with
+versions 0-7, and parsing descriptors with versions 0-15. (See Tor Trac bug
+#22534.)
+
+### RevisionNumber
+An integer count of the number of descriptor revisions uploaded by the service
+(v3 only).
+
+Services increment the revision number each time they upload their descriptor
+(at least every 3 hours), regardless of whether the descriptor content has
+changed.
+
+### DescriptorLifetime
+An integer number of seconds that the descriptor should be cached for
+(v3 only).
+
+Services set this to 3 hours (10,800).
+
+### EncodedDescriptorByteCount
+An unsigned integer count of bytes in the encoded form of the descriptor.
+
+v2 descriptors are limited to 20kB, and v3 descriptors are limited to 50kB
+(or the HSV3MaxDescriptorSize consensus parameter).
+
+The encoding and padding vary between v2 and v3, so byte count comparisons
+should be interpreted carefully.
+
+### IntroPointCount
+An unsigned integer count of introduction points in the descriptor. Only
+available for v2 descriptors with RequiresClientAuthFlag 0.
+
+v2 descriptors can have between 0 and 10 introduction points.
+
+### EncodedIntroPointByteCount
+An unsigned integer count of bytes in the encoded form of the intro point
+section of the descriptor.
+
+The intro point encoding varies between v2 and v3, so byte count comparisons
+should be interpreted carefully.
