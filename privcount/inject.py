@@ -19,6 +19,7 @@ from privcount.connection import listen, stopListening
 from privcount.data_collector import Aggregator
 from privcount.log import errorCallback, stop_reactor
 from privcount.protocol import TorControlServerProtocol
+from privcount.tagged_event import parse_tagged_event, get_float_value
 
 # set the log level
 #logging.basicConfig(level=logging.DEBUG)
@@ -238,7 +239,15 @@ class PrivCountDataInjector(ServerFactory):
             return
 
     def _get_event_times(self, msg):
+        '''
+        Return a tuple (start_time, end_time) for the event in msg.
+        '''
         parts = msg.split()
+        if len(parts) > 0:
+            event_desc = "in _get_event_times for {} event".format(parts[0])
+        else:
+            event_desc = "in _get_event_times"
+        # Positional Events: these events have hard-coded field orders
         if parts[0] == 'PRIVCOUNT_STREAM_BYTES_TRANSFERRED' and len(parts) == Aggregator.STREAM_BYTES_ITEMS + 1:
             return float(parts[6]), float(parts[6])
         elif parts[0] == 'PRIVCOUNT_STREAM_ENDED' and len(parts) == Aggregator.STREAM_ENDED_ITEMS + 1:
@@ -247,12 +256,39 @@ class PrivCountDataInjector(ServerFactory):
             return float(parts[7]), float(parts[8])
         elif parts[0] == 'PRIVCOUNT_CONNECTION_ENDED' and len(parts) == Aggregator.CONNECTION_ENDED_ITEMS + 1:
             return float(parts[2]), float(parts[3])
+        # Tagged Events: these events have fields with Key=Value pairs
+        # All current tagged events have at least one field
+        # Handles:
+        #  - 'PRIVCOUNT_HSDIR_CACHE_STORED'
+        elif '=' in msg and len(parts) >= 2:
+            items = parts[1:]
+            fields = parse_tagged_event(items)
+            # malformed
+            if len(items) > 0 and len(fields) == 0:
+                logging.warning("Malformed tagged event in: '{}' {}"
+                                .format(msg, event_desc))
+            else:
+                # PRIVCOUNT_HSDIR_CACHE_STORED has a single event time
+                event_time = get_float_value("EventTimestamp",
+                                             fields, event_desc,
+                                             is_mandatory=True)
+                return event_time, event_time
         else:
-            logging.warning("Wrong event field count or unknown event in: {}".format(msg))
+            logging.warning("Wrong event field count or unknown or empty event in: '{}' {}"
+                            .format(msg, event_desc))
         return 0.0, 0.0
 
     def _set_event_times(self, msg, start_time, end_time):
+        '''
+        Set the event times in msg to start_time and end_time, and return
+        the modified event.
+        '''
         parts = msg.split()
+        if len(parts) > 0:
+            event_desc = "in _set_event_times for {} event".format(parts[0])
+        else:
+            event_desc = "in _set_event_times"
+        # Positional Events: these events have hard-coded field orders
         if parts[0] == 'PRIVCOUNT_STREAM_BYTES_TRANSFERRED' and len(parts) == Aggregator.STREAM_BYTES_ITEMS + 1:
             parts[6] = end_time
         elif parts[0] == 'PRIVCOUNT_STREAM_ENDED' and len(parts) == Aggregator.STREAM_ENDED_ITEMS + 1:
@@ -261,8 +297,26 @@ class PrivCountDataInjector(ServerFactory):
             parts[7], parts[8] = start_time, end_time
         elif parts[0] == 'PRIVCOUNT_CONNECTION_ENDED' and len(parts) == Aggregator.CONNECTION_ENDED_ITEMS + 1:
             parts[2], parts[3] = start_time, end_time
+        # Tagged Events: these events have fields with tags, order is irrelevant
+        # All current tagged events have at least one field
+        # Handles:
+        #  - 'PRIVCOUNT_HSDIR_CACHE_STORED'
+        elif '=' in msg and len(parts) >= 2:
+            items = parts[1:]
+            fields = parse_tagged_event(items)
+            # malformed
+            if len(items) > 0 and len(fields) == 0:
+                logging.warning("Malformed tagged event in: '{}' {}"
+                                .format(msg, event_desc))
+            else:
+                # PRIVCOUNT_HSDIR_CACHE_STORED has a single event time
+                fields["EventTimestamp"] = str(end_time)
+                fields_list = ["{}={}".format(k, fields[k]) for k in fields]
+                parts_list = [parts[0]] + fields_list
+                return ' '.join(parts_list)
         else:
-            logging.warning("Wrong event field count or unknown event in: {}".format(msg))
+            logging.warning("Wrong event field count or unknown or empty event in: '{}' {}"
+                            .format(msg, event_desc))
         return ' '.join([str(p) for p in parts])
 
 def main():
