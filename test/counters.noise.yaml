@@ -4,6 +4,15 @@
 # using the "noise config" part of the output from "python statistics_noise.py"
 # using the "allocation" file output by the TS when the config is loaded
 # (this second method requires an existing noise input file)
+# using this script: (testing only)
+# (sort by reversed counter name, to sort similar suffixes together)
+# test/test_counter_match.sh | grep "^+" | cut -d+ -f2 | rev | sort | rev > missing_counters
+# (for counter in `cat missing_counters`;
+# do
+#     echo "    $counter:"
+#     echo "        estimated_value: 0.0"
+#     echo "        sensitivity: 0.0"
+# done) >> test/counters.noise.yaml
 
 # It is safe (albeit potentially confusing) to leave the calculated sigma
 # values in these files, they are ignored, and re-calculated each time the file

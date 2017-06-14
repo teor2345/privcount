@@ -53,9 +53,20 @@ Extract only the bins with non-zero counts from a histogram:
 
     jq '.Tally.CounterName.bins | map(select(.[2] > 0))'
 
-## Counter Tests
+### Updating This Documentation
 
-Every PrvivCount counter has at least one test in this section.
+When you add new counters, you can add their names to this file using:
+
+    test/test_counter_match.sh | grep "^+" | cut -d+ -f2 | rev | sort | rev > missing_counters
+    (for counter in `cat missing_counters`; do echo "- $counter"; done) >> doc/CounterTests.markdown
+
+This sorts by reversed counter name, to sort similar suffixes together.
+
+Then test the counters, and fill in the results.
+
+## All Nodes Counter Tests
+
+Every PrivCount counter has at least one test in this section.
 (Checked by test/test_counter_match.sh)
 
 Any specific values listed in the tests are from the chutney basic-min network,
@@ -71,6 +82,8 @@ Bins are half-open intervals, and use the notation [min, max).
     '.Tally.ZeroCount.bins[0][2] == 0'
 
 The ZeroCount is 0 in all valid outcome files.
+
+## Exit Counter Tests
 
 ### Exit Circuits
 
@@ -368,6 +381,8 @@ On my machine, for 1501 bytes, the transition is:
 Transitions from the START state are not counted in
 ExitStreamTrafficModelTransitionCount.
 See the notes under ExitStreamTrafficModelTransitionCount.
+
+## Entry Counter Tests
 
 ### Entry Connections
 

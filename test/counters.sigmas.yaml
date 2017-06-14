@@ -1,4 +1,20 @@
 # sigma values define the global noise we want for privacy for each stat
+# this is a legacy file format, use counters.noise.yaml for new work
+
+# Files like this can be created:
+# using the "sigma" elements of the noise config of the output from
+# "python statistics_noise.py"
+# using the "sigma" elements of the "allocation" file output by the TS when
+# the config is loaded
+# (this second method requires an existing noise input file)
+# using this script: (testing only)
+# (sort by reversed counter name, to sort similar suffixes together)
+# test/test_counter_match.sh | grep "^+" | cut -d+ -f2 | rev | sort | rev > missing_counters
+# (for counter in `cat missing_counters`;
+# do
+#     echo "    $counter:"
+#     echo "        sigma: 0.0"
+# done) >> test/counters.noise.yaml
 
 # THESE NOISE CONFIGURATIONS OFFER ABSOLUTELEY NO PRIVACY AND SHOULD ONLY BE USED
 # FOR TESTING PURPOSES IN LOCAL PRIVATE NON-DEPLOYMENT SCENARIOS

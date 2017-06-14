@@ -66,6 +66,12 @@ for code in "$TEST_DIR"/../privcount/{counter,data_collector}.py; do
         cat "$TEST_DIR/traffic_model.py.names.extra" \
             >> "$OUT_PATH.names.unsorted"
     fi
+    # Add the HSDir bins to the data_collector file only
+    # The HSDir counters are code-driven, so they don't appear as literals
+    if [ `basename "$code"` = 'data_collector.py' ]; then
+        cat "$TEST_DIR/counters.bins.yaml.names" | grep "^HSDir[2-3]" \
+            >> "$OUT_PATH.names.unsorted" || true
+    fi
     # Add the ZeroCount counter (it has no events and no increments)
     cat "$TEST_DIR/statistics_noise.py.names.extra" \
         >> "$OUT_PATH.names.unsorted"
