@@ -17,9 +17,9 @@ from twisted.internet.protocol import ReconnectingClientFactory
 
 from privcount.config import normalise_path, choose_secret_handshake_path
 from privcount.connection import connect, disconnect, validate_connection_config, choose_a_connection, get_a_control_password
-from privcount.counter import SecureCounters, counter_modulus, add_counter_limits_to_config, combine_counters, has_noise_weight, get_noise_weight, count_bins
+from privcount.counter import SecureCounters, counter_modulus, add_counter_limits_to_config, combine_counters, has_noise_weight, get_noise_weight, count_bins, parse_tagged_event, get_valid_counters
 from privcount.crypto import get_public_digest_string, load_public_key_string, encrypt
-from privcount.log import log_error, format_delay_time_wait, format_last_event_time_since, format_elapsed_time_since, errorCallback
+from privcount.log import log_error, format_delay_time_wait, format_last_event_time_since, format_elapsed_time_since, errorCallback, summarise_string
 from privcount.node import PrivCountClient, EXPECTED_EVENT_INTERVAL_MAX, EXPECTED_CONTROL_ESTABLISH_MAX
 from privcount.protocol import PrivCountClientProtocol, TorControlClientProtocol, get_privcount_version
 from privcount.traffic_model import TrafficModel, check_traffic_model_config
@@ -800,14 +800,16 @@ class Aggregator(ReconnectingClientFactory):
         if not self.secure_counters:
             return False
 
-        # fail on empty events
-        if len(event) <= 1:
+        # fail on events with no code
+        if len(event) < 1:
             return False
 
         event_code, items = event[0], event[1:]
         self.last_event_time = time()
 
         # hand valid events off to the aggregator
+
+        # these events have positional fields: order matters
         if event_code == 'PRIVCOUNT_STREAM_BYTES_TRANSFERRED':
             if len(items) == Aggregator.STREAM_BYTES_ITEMS:
                 return self._handle_bytes_event(items[:Aggregator.STREAM_BYTES_ITEMS])
@@ -819,7 +821,6 @@ class Aggregator(ReconnectingClientFactory):
                 return self._handle_stream_event(items[:Aggregator.STREAM_ENDED_ITEMS])
             else:
                 return False
-
 
         elif event_code == 'PRIVCOUNT_CIRCUIT_ENDED':
             if len(items) == Aggregator.CIRCUIT_ENDED_ITEMS:
@@ -833,11 +834,23 @@ class Aggregator(ReconnectingClientFactory):
             else:
                 return False
 
+        # these events have tagged fields: fields may be optional
+        elif event_code == 'PRIVCOUNT_HSDIR_CACHE_STORED':
+            fields = parse_tagged_event(items)
+            # malformed
+            if len(items) > 0 and len(fields) == 0:
+                return False
+            else:
+                return self._handle_hsdir_stored_event(fields)
+
         return True
 
     STREAM_BYTES_ITEMS = 6
 
+    # Positional event: fields is a list of Values.
+    # All fields are mandatory, order matters
     # 'PRIVCOUNT_STREAM_BYTES_TRANSFERRED', ChanID, CircID, StreamID, isOutbound, BW, Time
+    # See doc/TorEvents.markdown for details
     def _handle_bytes_event(self, items):
         assert(len(items) == Aggregator.STREAM_BYTES_ITEMS)
 
@@ -858,7 +871,10 @@ class Aggregator(ReconnectingClientFactory):
 
     STREAM_ENDED_ITEMS = 10
 
+    # Positional event: fields is a list of Values.
+    # All fields are mandatory, order matters
     # 'PRIVCOUNT_STREAM_ENDED', ChanID, CircID, StreamID, ExitPort, ReadBW, WriteBW, TimeStart, TimeEnd, RemoteHost, RemoteIP
+    # See doc/TorEvents.markdown for details
     def _handle_stream_event(self, items):
         assert(len(items) == Aggregator.STREAM_ENDED_ITEMS)
 
@@ -1056,7 +1072,10 @@ class Aggregator(ReconnectingClientFactory):
 
     CIRCUIT_ENDED_ITEMS = 12
 
+    # Positional event: fields is a list of Values.
+    # All fields are mandatory, order matters
     # 'PRIVCOUNT_CIRCUIT_ENDED', ChanID, CircID, NCellsIn, NCellsOut, ReadBWExit, WriteBWExit, TimeStart, TimeEnd, PrevIP, PrevIsClient, NextIP, NextIsEdge
+    # See doc/TorEvents.markdown for details
     def _handle_circuit_event(self, items):
         assert(len(items) == Aggregator.CIRCUIT_ENDED_ITEMS)
 
@@ -1223,7 +1242,10 @@ class Aggregator(ReconnectingClientFactory):
 
     CONNECTION_ENDED_ITEMS = 5
 
+    # Positional event: fields is a list of Values.
+    # All fields are mandatory, order matters
     # 'PRIVCOUNT_CONNECTION_ENDED', ChanID, TimeStart, TimeEnd, IP, isClient
+    # See doc/TorEvents.markdown for details
     def _handle_connection_event(self, items):
         assert(len(items) == Aggregator.CONNECTION_ENDED_ITEMS)
 
@@ -1243,6 +1265,802 @@ class Aggregator(ReconnectingClientFactory):
                                            bin=(end - start),
                                            inc=1)
         return True
+
+    @staticmethod
+    def is_field_valid(field_name, fields, event_desc,
+                       is_mandatory=False, allowed_version=None):
+        '''
+        If is_mandatory is True, check that fields[field_name] exists.
+        If it is missing, return False and log a warning using event_desc.
+        
+        If allowed_version is not None, check if fields[field_name] exists,
+        and if allowed_version is the same as the hidden service version.
+        If it is not, return False and log a warning using event_desc.
+
+        Otherwise, return True (the event should be processed).
+        '''
+        if is_mandatory and field_name not in fields:
+            logging.warning("Rejected missing {} {}"
+                            .format(field_name, event_desc))
+            return False
+
+        # This could cause recursion if hs_version does the check below, so
+        # bail out early
+        if allowed_version is None:
+            # No version check
+            return True
+
+        hs_version = Aggregator.get_hs_version(fields, event_desc)
+
+        # this should have been checked earlier
+        assert hs_version == 2 or hs_version == 3
+
+
+        if hs_version != allowed_version and field_name in fields:
+            logging.warning("Ignored unexpected v{} {} {}"
+                            .format(hs_version, field_name, event_desc))
+            return False
+
+        return True
+
+    @staticmethod
+    def is_string_valid(field_name, fields, event_desc,
+                        is_mandatory=False, allowed_version=None,
+                        min_len=None, max_len=None):
+        '''
+        Check that fields[field_name] passes is_field_valid() and has a length
+        between min_len and max_len (inclusive). Use None for no length check.
+        Don't pass floating-point values for min_len and max_len: they can be
+        inaccurate when compared with integer lengths.
+
+        If any check fails, return False (the event is ignored), and log a
+        warning using event_desc.
+        Otherwise, return True (the event should be processed).
+        '''
+        if not Aggregator.is_field_valid(field_name, fields, event_desc,
+                                         is_mandatory=is_mandatory,
+                                         allowed_version=allowed_version):
+            return False
+        if field_name not in fields:
+            # valid optional field, keep on processing other fields
+            return True
+        field_value = fields[field_name]
+        field_len = len(field_value)
+        field_value_log = summarise_string(field_value, 20)
+        if min_len is not None and field_len < min_len:
+            logging.warning("Ignored {} length {}: '{}', must be at least {} characters {}"
+                            .format(field_name, field_len, field_value_log,
+                                    min_len, event_desc))
+            # we can't process it
+            return False
+        if max_len is not None and field_len > max_len:
+            logging.warning("Ignored {} length {}: '{}', must be at most {} characters {}"
+                            .format(field_name, field_len, field_value_log,
+                                    max_len, event_desc))
+            # we can't process it
+            return False
+        # it is valid and we want to keep on processing
+        return True
+
+    @staticmethod
+    def is_integer_valid(field_name, fields, event_desc,
+                         is_mandatory=False, allowed_version=None,
+                         min_value=None, max_value=None):
+        '''
+        Check that fields[field_name] passes is_field_valid(), is a valid int,
+        and is between min_value and max_value (inclusive). Use None for no
+        range check.
+
+        Return values are like is_string_valid.
+        '''
+        if not Aggregator.is_field_valid(field_name, fields, event_desc,
+                                         is_mandatory=is_mandatory,
+                                         allowed_version=allowed_version):
+            return False
+        if field_name not in fields:
+            # valid optional field, keep on processing
+            return True
+        try:
+            field_value = int(fields[field_name])
+        except ValueError as e:
+            # not an integer
+            logging.warning("Ignored {} {}, must be an integer: '{}' {}"
+                            .format(field_name, fields[field_name], e,
+                                    event_desc))
+            return False
+        if min_value is not None and field_value < min_value:
+            logging.warning("Ignored {} {}, must be at least {} {}"
+                            .format(field_name, field_value, min_value,
+                                    event_desc))
+            # we can't process it
+            return False
+        if max_value is not None and field_value > max_value:
+            logging.warning("Ignored {} {}, must be at most {} {}"
+                            .format(field_name, field_value, max_value,
+                                    event_desc))
+            # we can't process it
+            return False
+        # it is valid and we want to keep on processing
+        return True
+
+    @staticmethod
+    def is_flag_valid(field_name, fields, event_desc,
+                      is_mandatory=False, allowed_version=None):
+        '''
+        Check that fields[field_name] passes is_field_valid() and is 0 or 1.
+        See is_integer_valid for details.
+        '''
+        return Aggregator.is_integer_valid(field_name, fields, event_desc,
+                                           is_mandatory=is_mandatory,
+                                           allowed_version=allowed_version,
+                                           min_value=0,
+                                           max_value=1)
+
+    @staticmethod
+    def is_float_valid(field_name, fields, event_desc,
+                       is_mandatory=False, allowed_version=None,
+                       min_value=None, max_value=None):
+        '''
+        Check that fields[field_name] passes is_field_valid(), is a valid
+        float (includes integral values), and is between min_value and
+        max_value (inclusive). Use None for no range check.
+
+        Don't pass integer values for min_value and max_value: they can
+        be inaccurate when compared with floating-point.
+
+        Return values are like is_string_valid.
+        '''
+        if not Aggregator.is_field_valid(field_name, fields, event_desc,
+                                         allowed_version=allowed_version,
+                                         is_mandatory=is_mandatory):
+            return False
+        if field_name not in fields:
+            # valid optional field, keep on processing
+            return True
+        try:
+            field_value = float(fields[field_name])
+        except ValueError as e:
+            # not a float
+            logging.warning("Ignored {} {}, must be a float: '{}' {}"
+                            .format(field_name, fields[field_name], e,
+                                    event_desc))
+            return False
+        if min_value is not None and field_value < min_value:
+            logging.warning("Ignored {} {}, must be at least {} {}"
+                            .format(field_name, field_value, min_value,
+                                    event_desc))
+            # we can't process it
+            return False
+        if max_value is not None and field_value > max_value:
+            logging.warning("Ignored {} {}, must be at most {} {}"
+                            .format(field_name, field_value, max_value,
+                                    event_desc))
+            # we can't process it
+            return False
+        # it is valid and we want to keep on processing
+        return True
+
+    @staticmethod
+    def is_hs_version_valid(fields, event_desc):
+        '''
+        Check that fields["HiddenServiceVersionNumber"] exists and is 2 or 3.
+        See is_integer_valid for details.
+        '''
+        return Aggregator.is_integer_valid("HiddenServiceVersionNumber",
+                                           fields, event_desc,
+                                           is_mandatory=True,
+                                           min_value=2, max_value=3)
+
+    @staticmethod
+    def is_intro_point_count_valid(fields, event_desc):
+        '''
+        If fields["IntroPointCount"] exists, checks that it is below the
+        expected maximum.
+        See is_integer_valid for details.
+        '''
+        # Version 3 always has intro points encrypted
+        return Aggregator.is_integer_valid("IntroPointCount",
+                                           fields, event_desc,
+                                           is_mandatory=False,
+                                           allowed_version=2,
+                                           min_value=0,
+                                           max_value=10)
+
+    @staticmethod
+    def is_descriptor_byte_count_valid(field_name, fields, event_desc):
+        '''
+        If fields[field_name] exists, checks that it is below the expected
+        maximum descriptor byte count for the hidden service version.
+        (There is no minimum.)
+        See is_integer_valid for details.
+        '''
+        hs_version = Aggregator.get_hs_version(fields, event_desc)
+        if hs_version is None:
+            return False
+
+        assert hs_version == 2 or hs_version == 3
+        # The hard-coded v2 limit is 20kB, but services could exceed that
+        # So let's start warning at twice that.
+        # The default v3 limit is 50kB, but can be changed in the consensus
+        # So let's start warning if the actual v3 byte count is > 1MB
+        desc_max = 2*20*1024 if hs_version == 2 else 1024*1024
+
+        return Aggregator.is_integer_valid(field_name,
+                                           fields, event_desc,
+                                           is_mandatory=False,
+                                           min_value=0,
+                                           max_value=desc_max)
+
+    @staticmethod
+    def get_string_value(field_name, fields, event_desc,
+                         is_mandatory=False):
+        '''
+        Check that fields[field_name] exists.
+        Asserts if is_mandatory is True and it does not exist.
+
+        If it does exist, return it as a string.
+        If it is missing, return None.
+        (There are no invalid strings.)
+        '''
+        if field_name not in fields:
+            assert not is_mandatory
+            return None
+
+        # This should have been checked earlier
+        # There are no string checks, but we do this for consistency
+        assert Aggregator.is_string_valid(field_name, fields, event_desc)
+
+        return fields[field_name]
+
+    @staticmethod
+    def get_int_value(field_name, fields, event_desc,
+                      is_mandatory=False):
+        '''
+        Check that fields[field_name] exists and is a valid integer.
+        If it is an invalid integer, assert.
+        Return values are like get_string_value.
+        '''
+        if field_name not in fields:
+            assert not is_mandatory
+            return None
+
+        # This should have been checked earlier
+        # We're just using this for its integer format check
+        assert Aggregator.is_integer_valid(field_name, fields, event_desc)
+
+        return int(fields[field_name])
+
+    @staticmethod
+    def get_flag_value(field_name, fields, event_desc,
+                       is_mandatory=False):
+        '''
+        Check that fields[field_name] exists and is a valid numeric boolean
+        flag.
+        If it is an invalid integer or out of range of a bool, assert.
+        Return values are like get_string_value.
+        '''
+        if field_name not in fields:
+            assert not is_mandatory
+            return None
+
+        # This should have been checked earlier
+        # We're just using this for its integer format and bool range check
+        assert Aggregator.is_flag_valid(field_name, fields, event_desc)
+
+        return bool(int(fields[field_name]))
+
+    @staticmethod
+    def get_float_value(field_name, fields, event_desc,
+                        is_mandatory=False):
+        '''
+        Check that fields[field_name] exists and is a valid float (including
+        integral values).
+        If it is an invalid float, assert.
+        Return values are like get_string_value.
+        '''
+        if field_name not in fields:
+            assert not is_mandatory
+            return None
+
+        # This should have been checked earlier
+        # We're just using this for its float format check
+        assert Aggregator.is_float_valid(field_name, fields, event_desc)
+
+        return float(fields[field_name])
+
+    @staticmethod
+    def get_hs_version(fields, event_desc):
+        '''
+        Check that fields["HiddenServiceVersionNumber"] exists and is valid.
+        If it is, return it as an integer.
+        Otherwise, assert.
+        See is_hs_version_valid for details.
+        '''
+        # This should have been checked earlier
+        assert Aggregator.is_hs_version_valid(fields, event_desc):
+
+        return Aggregator.get_int_value("HiddenServiceVersionNumber",
+                                        fields, event_desc,
+                                        is_mandatory=True)
+
+    @staticmethod
+    def warn_unexpected_field_value(field_name, fields, event_desc):
+        '''
+        Called when we expect field_name to be a particular value, and it is
+        not. Log a warning containing field_name, fields[field_name], and
+        event_desc.
+        '''
+        logging.warning("Unexpected {} value '{}' {}. Maybe we should add a counter for it?"
+                        .format(field_name, fields[field_name], event_desc))
+
+    @staticmethod
+    def warn_unknown_counter(counter_name, origin_desc, event_desc):
+        '''
+        If counter_name is an unknown counter name, log a warning containing
+        origin_desc and event_desc.
+        '''
+        if counter_name not in get_valid_counters():
+            logging.warning("Ignored unknown counter {} from {} {}. Is your PrivCount Tor version newer than your PrivCount version?"
+                            .format(counter_name, origin_desc, event_desc))
+
+    @staticmethod
+    def are_common_fields_valid(fields, event_desc):
+        '''
+        Check if the common fields across hidden service events are valid.
+        Returns True if they are all valid, False if one or more are not.
+        Logs a warning using event_desc for the first field that is invalid.
+        '''
+        # Validate the mandatory fields
+
+        # Make sure we were designed to work with the event's
+        # HiddenServiceVersionNumber
+        is_valid = Aggregator.is_hs_version_valid(fields, event_desc)
+        if not is_valid:
+            return False
+
+        hs_version = Aggregator.get_hs_version(fields, event_desc)
+
+        # Check the event timestamp
+        is_event_ts_valid = Aggregator.is_float_valid("EventTimestamp",
+                                                      fields, event_desc,
+                                                      is_mandatory=True,
+                                                      min_value=0.0)
+        if not is_event_ts_valid:
+            return False
+
+        # Check the cache flags
+
+        is_existing_valid = Aggregator.is_flag_valid(
+                                                  "HasExistingCacheEntryFlag",
+                                                  fields, event_desc
+                                                  is_mandatory=False)
+        if not is_existing_valid:
+            return False
+
+        # Check the Intro Counts and Descriptor Byte Count
+
+        is_intro_bytes_valid = is_descriptor_byte_count_valid(
+                                                "EncodedIntroPointByteCount",
+                                                fields, event_desc)
+        if not is_intro_bytes_valid:
+            return False
+
+        is_desc_bytes_valid = is_descriptor_byte_count_valid(
+                                                "EncodedDescriptorByteCount",
+                                                fields, event_desc)
+        if not is_desc_bytes_valid:
+            return False
+
+        # Check the v2 fields
+
+        is_intro_valid = Aggregator.is_intro_point_count_valid(fields,
+                                                               event_desc)
+        if not is_intro_valid:
+            return False
+
+        # Version 3 always has intro points encrypted, so we can't tell if it
+        # uses client auth
+        is_auth_valid = Aggregator.is_flag_valid("RequiresClientAuthFlag",
+                                                 is_mandatory=False,
+                                                 allowed_version=2,
+                                                 fields, event_desc)
+        if not is_auth_valid:
+            return False
+
+        is_create_time_valid = Aggregator.is_float_valid(
+                                                      "DescriptorCreationTime",
+                                                      fields, event_desc,
+                                                      is_mandatory=False,
+                                                      allowed_version=2,
+                                                      min_value=0.0)
+        if not is_create_time_valid:
+            return False
+
+        # Check the v3 fields
+
+        # Version 2 doesn't have this field
+        is_rev_valid = Aggregator.is_int_valid("RevisionNumber",
+                                               fields, event_desc,
+                                               is_mandatory=False,
+                                               allowed_version=3,
+                                               min_value=0)
+        if not is_rev_valid:
+            return False
+
+        # We don't collect these fields, because all services put the same
+        # value in every descriptor. But if they are not, log a warning, and
+        # keep processing the event.
+
+        # Is the value 0xc (1 << 2 + 1 << 3)?
+        const_bitfield = 0xc
+        is_protocol_const = Aggregator.is_integer_valid(
+                                                  "SupportedProtocolBitfield",
+                                                  fields, event_desc,
+                                                  is_mandatory=False,
+                                                  allowed_version=2,
+                                                  min_value=const_bitfield,
+                                                  max_value=const_bitfield)
+        if not is_protocol_const:
+            Aggregator.warn_unexpected_field_value("SupportedProtocolBitfield",
+                                                   fields, event_desc)
+
+        # Is the value 3 hours?
+        const_lifetime = 3*60*60
+        is_lifetime_const = Aggregator.is_int_valid("DescriptorLifetime",
+                                                    is_mandatory=False,
+                                                    allowed_version=3,
+                                                    fields, event_desc,
+                                                    min_value=const_lifetime,
+                                                    max_value=const_lifetime)
+        if not is_lifetime_const:
+            Aggregator.warn_unexpected_field_value("DescriptorLifetime",
+                                                   fields, event_desc)
+
+        # if everything passed, this much is ok
+        return True
+
+    @staticmethod
+    def are_hsdir_stored_fields_valid(fields, event_desc):
+        '''
+        Check if the PRIVCOUNT_HSDIR_CACHE_STORED fields are valid.
+        Returns True if they are all valid, False if one or more are not.
+        Logs a warning using event_desc for the first field that is invalid.
+        '''
+
+        are_common_valid = Aggregator.are_common_fields_valid(fields,
+                                                              event_desc)
+        if not are_common_valid:
+            return False
+
+        # Validate the mandatory cache fields
+
+        # 50 is an arbitrary limit, the current maximum is 11 characters
+        is_action_valid = Aggregator.is_string_valid("CacheActionString",
+                                                     fields, event_desc,
+                                                     is_mandatory=True,
+                                                     min_len=1,
+                                                     max_len=50)
+        if not is_action_valid:
+            return False
+
+        action_str = Aggregator.get_string_value("CacheActionString",
+                                                 fields, event_desc,
+                                                 is_mandatory=True)
+
+        is_added_valid = Aggregator.is_flag_valid("WasAddedToCacheFlag",
+                                                  fields, event_desc,
+                                                  is_mandatory=True)
+        if not is_added_valid:
+            return False
+
+        # Validate the optional cache fields
+
+        has_existing = Aggregator.get_flag_value("HasExistingCacheEntryFlag",
+                                                 fields, event_desc,
+                                                 is_mandatory=False)
+
+        # Some CacheActionStrings must have HasExistingCacheEntryFlag
+        if action_str == "Expired" or action_str == "Future":
+            if has_existing is None:
+                logging.warning("Ignored CacheActionString {} with HasExistingCacheEntryFlag None, HasExistingCacheEntryFlag must be 1 or 0 {}"
+                                .format(action_str, event_desc))
+                return False
+
+        # if everything passed, we're ok
+        return True
+
+    def _increment_hsdir_stored_counters(self, counter_suffix, hs_version,
+                                         action_str, was_added, has_existing,
+                                         has_client_auth,
+                                         bin=SINGLE_BIN,
+                                         inc=1,
+                                         log_missing_counters=True):
+        '''
+        Increment bin by inc for the set of counters ending in
+        counter_suffix, using hs_version, action_str, was_added,
+        has_existing, and has_client_auth to create the counter names.
+        If log_missing_counters, warn the operator when a requested counter
+        is not in the table in counters.py. Otherwise, unknown names are
+        ignored.
+        '''
+        # create counter names from version, action_str and was_added
+        action_str = action_str.title()
+        added_str = "Add" if was_added else "Reject"
+
+        store_counter = "HSDir{}Store{}".format(hs_version,
+                                                counter_suffix)
+        added_counter = "HSDir{}Store{}{}".format(hs_version,
+                                                  added_str,
+                                                  counter_suffix)
+        if has_client_auth is not None:
+            # v2 only: we checked in are_hsdir_stored_fields_valid()
+            assert hs_version == 2
+            auth_str = "ClientAuth" if has_client_auth else "NoClientAuth"
+            auth_counter = "HSDir{}Store{}{}".format(hs_version,
+                                                     auth_str,
+                                                     counter_suffix)
+            added_auth_counter = "HSDir{}Store{}{}".format(hs_version,
+                                                           added_str,
+                                                           auth_str,
+                                                           counter_suffix)
+        # based on added_counter
+        if action_str == "Expired" or action_str == "Future":
+            # v2 only: we checked in are_hsdir_stored_fields_valid()
+            assert hs_version == 2
+            assert has_existing is not None
+            assert has_client_auth is not None:
+            existing_str = "HaveCached" if has_existing else "NoCached"
+            action_counter = "HSDir{}Store{}{}{}{}".format(hs_version,
+                                                           added_str,
+                                                           action_str,
+                                                           existing_str,
+                                                           counter_suffix)
+            action_auth_counter = "HSDir{}Store{}{}{}{}{}".format(
+                                                                hs_version,
+                                                                added_str,
+                                                                action_str,
+                                                                existing_str,
+                                                                auth_str,
+                                                                counter_suffix)
+        else:
+            # The action already tells us whether there was an existing
+            # descriptor. See doc/CounterDefinitions.markdown for details.
+            action_counter = "HSDir{}Store{}{}{}".format(hs_version,
+                                                         added_str,
+                                                         action_str,
+                                                         counter_suffix)
+            if has_client_auth is not None:
+                # v2 only: we checked in are_hsdir_stored_fields_valid()
+                assert hs_version == 2
+                assert has_client_auth is not None:
+                action_auth_counter = "HSDir{}Store{}{}{}{}".format(
+                                                                hs_version,
+                                                                added_str,
+                                                                action_str,
+                                                                auth_str,
+                                                                counter_suffix)
+
+        # warn the operator if we don't know the counter name
+        if log_missing_counters:
+            Aggregator.warn_unknown_counter(store_counter,
+                                            counter_suffix,
+                                            event_desc)
+            added_origin = "WasAddedToCacheFlag and {}".format(counter_suffix)
+            Aggregator.warn_unknown_counter(added_counter,
+                                            added_origin,
+                                            event_desc)
+            action_origin = "CacheActionString and HasExistingCacheEntryFlag and {}".format(counter_suffix)
+            Aggregator.warn_unknown_counter(action_counter,
+                                            action_origin,
+                                            event_desc)
+
+            if has_client_auth is not None:
+                # v2 only: we checked in are_hsdir_stored_fields_valid()
+                assert hs_version == 2
+
+                auth_origin = "RequiresClientAuthFlag and {}".format(counter_suffix)
+                Aggregator.warn_unknown_counter(auth_counter,
+                                                auth_origin,
+                                                event_desc)
+                added_auth_origin = "WasAddedToCacheFlag and RequiresClientAuthFlag and {}".format(counter_suffix)
+                Aggregator.warn_unknown_counter(added_auth_counter,
+                                                added_auth_origin,
+                                                event_desc)
+                action_auth_origin = "CacheActionString and HasExistingCacheEntryFlag and RequiresClientAuthFlag and {}".format(counter_suffix)
+                Aggregator.warn_unknown_counter(action_auth_counter,
+                                                action_auth_origin,
+                                                event_desc)
+
+        # Increment the counters
+        self.secure_counters.increment(store_counter,
+                                       bin=bin,
+                                       inc=inc)
+        self.secure_counters.increment(added_counter,
+                                       bin=bin,
+                                       inc=inc)
+        self.secure_counters.increment(action_counter,
+                                       bin=bin,
+                                       inc=inc)
+        if has_client_auth is not None:
+            # v2 only: we checked in are_hsdir_stored_fields_valid()
+            assert hs_version == 2
+
+            self.secure_counters.increment(auth_counter,
+                                           bin=bin,
+                                           inc=inc)
+            self.secure_counters.increment(added_auth_counter,
+                                           bin=bin,
+                                           inc=inc)
+            self.secure_counters.increment(action_auth_counter,
+                                           bin=bin,
+                                           inc=inc)
+
+    def _handle_hsdir_stored_event(self, fields):
+        '''
+        Process a PRIVCOUNT_HSDIR_CACHE_STORED event
+        This is a tagged event: fields is a dictionary of Key=Value pairs.
+        Fields may be optional, order is unimportant.
+        Fields used:
+        Common:
+          HiddenServiceVersionNumber, EventTimestamp,
+          CacheActionString, HasExistingCacheEntryFlag, WasAddedToCacheFlag,
+          EncodedDescriptorByteCount, EncodedIntroPointByteCount
+        v2:
+          DescriptorCreationTime, SupportedProtocolBitfield,
+          RequiresClientAuthFlag, IntroPointCount
+        v3:
+          RevisionNumber, DescriptorLifetime
+        See doc/TorEvents.markdown for all field names and definitions.
+        Returns True if an event was successfully processed (or ignored).
+        Never returns False: we prefer to warn about malformed events and
+        continue processing.
+        '''
+        event_desc = "in PRIVCOUNT_HSDIR_CACHE_STORED event"
+
+        is_valid = Aggregator.are_hsdir_stored_fields_valid(fields,
+                                                            event_desc)
+        if not is_valid:
+            # we handled the event by ignoring it as invalid
+            return True
+
+        # Extract mandatory fields
+        hs_version = Aggregator.get_hs_version(fields, event_desc)
+        event_ts = Aggregator.get_float("EventTimestamp",
+                                        fields, event_desc,
+                                        is_mandatory=True)
+        action_str = Aggregator.get_string_value("CacheActionString",
+                                                 fields, event_desc,
+                                                 is_mandatory=True)
+        was_added = Aggregator.get_flag_value("WasAddedToCacheFlag",
+                                              fields, event_desc,
+                                              is_mandatory=True)
+
+        # Extract the optional fields
+        # Cache common
+        has_existing = Aggregator.get_flag_value("HasExistingCacheEntryFlag",
+                                                 fields, event_desc,
+                                                 is_mandatory=False)
+        # Intro / Descriptor common
+        intro_bytes = Aggregator.get_int_value("EncodedIntroPointByteCount",
+                                               fields, event_desc,
+                                               is_mandatory=False)
+        desc_bytes = Aggregator.get_int_value("EncodedDescriptorByteCount",
+                                              fields, event_desc,
+                                              is_mandatory=False)
+        create_time = Aggregator.get_float("DescriptorCreationTime",
+                                           fields, event_desc,
+                                           is_mandatory=False)
+        # Intro / Descriptor v2
+        has_client_auth = Aggregator.get_flag_value("RequiresClientAuthFlag",
+                                                    fields, event_desc,
+                                                    is_mandatory=False)
+        intro_count = Aggregator.get_int_value("IntroPointCount",
+                                               fields, event_desc,
+                                               is_mandatory=False)
+
+        # Descriptor v3
+        revision_num = Aggregator.get_int_value("RevisionNumber",
+                                                fields, event_desc,
+                                                is_mandatory=False)
+
+        # Increment counters for mandatory fields
+        # These are the base counters that cover all the upload cases
+        self._increment_hsdir_stored_counters("Count",
+                                              hs_version,
+                                              action_str,
+                                              was_added,
+                                              has_existing,
+                                              has_client_auth,
+                                              bin=SINGLE_BIN,
+                                              inc=1,
+                                              log_missing_counters=True)
+
+        # Increment counters for common optional fields
+
+        if intro_bytes is not None:
+            self._increment_hsdir_stored_counters("IntroByteCount",
+                                                  hs_version,
+                                                  action_str,
+                                                  was_added,
+                                                  has_existing,
+                                                  has_client_auth,
+                                                  bin=SINGLE_BIN,
+                                                  inc=intro_bytes,
+                                                  log_missing_counters=False)
+            self._increment_hsdir_stored_counters("IntroByteHistogram",
+                                                  hs_version,
+                                                  action_str,
+                                                  was_added,
+                                                  has_existing,
+                                                  has_client_auth,
+                                                  bin=intro_bytes,
+                                                  inc=1,
+                                                  log_missing_counters=False)
+        if desc_bytes is not None:
+            self._increment_hsdir_stored_counters("DescriptorByteCount",
+                                                  hs_version,
+                                                  action_str,
+                                                  was_added,
+                                                  has_existing,
+                                                  has_client_auth,
+                                                  bin=SINGLE_BIN,
+                                                  inc=desc_bytes,
+                                                  log_missing_counters=False)
+            self._increment_hsdir_stored_counters("DescriptorByteHistogram",
+                                                  hs_version,
+                                                  action_str,
+                                                  was_added,
+                                                  has_existing,
+                                                  has_client_auth,
+                                                  bin=desc_bytes,
+                                                  inc=1,
+                                                  log_missing_counters=False)
+
+        # Increment counters for v2 optional fields
+
+        if intro_count is not None:
+            # we checked in are_hsdir_stored_fields_valid()
+            assert hs_version == 2
+            # we don't bother collecting detailed rejection subcategories
+            # to add rejection counters, their names to the list in counter.py
+            self._increment_hsdir_stored_counters("IntroPointHistogram",
+                                                  hs_version,
+                                                  action_str,
+                                                  was_added,
+                                                  has_existing,
+                                                  has_client_auth,
+                                                  bin=intro_count,
+                                                  inc=1,
+                                                  log_missing_counters=False)
+        if create_time is not None:
+            # we checked in are_hsdir_stored_fields_valid()
+            assert hs_version == 2
+            # create_time is truncated to the nearest hour
+            delay_time = event_ts - create_time
+            self._increment_hsdir_stored_counters("UploadDelayTime",
+                                                  hs_version,
+                                                  action_str,
+                                                  was_added,
+                                                  has_existing,
+                                                  has_client_auth,
+                                                  bin=delay_time,
+                                                  inc=1,
+                                                  log_missing_counters=False)
+
+        # Increment counters for v3 optional fields
+
+        if revision_num is not None:
+            # we checked in are_hsdir_stored_fields_valid()
+            assert hs_version == 3
+            self._increment_hsdir_stored_counters("RevisionHistogram",
+                                                  hs_version,
+                                                  action_str,
+                                                  was_added,
+                                                  has_existing,
+                                                  has_client_auth,
+                                                  bin=revision_num,
+                                                  inc=1,
+                                                  log_missing_counters=False)
 
     def _do_rotate(self):
         '''
