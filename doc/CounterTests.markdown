@@ -514,3 +514,136 @@ over the rotation period.
 
 Using the instructions under EntryClientIPCount, I see 2 counts in the
 [0,4) circuits per unique IP address bin.
+
+## HSDir Counter Tests
+
+### TODO: Category Name
+
+- HSDir2StoreCount
+- HSDir3StoreCount
+- HSDir2StoreAddCount
+- HSDir3StoreAddCount
+- HSDir2StoreRejectExpiredHaveCachedCount
+- HSDir2StoreRejectFutureHaveCachedCount
+- HSDir2StoreRejectExpiredNoCachedCount
+- HSDir2StoreRejectFutureNoCachedCount
+- HSDir2StoreAddUpdatedCount
+- HSDir3StoreAddUpdatedCount
+- HSDir2StoreRejectUnparseableCount
+- HSDir3StoreRejectUnparseableCount
+- HSDir2StoreRejectDuplicateCount
+- HSDir2StoreRejectObsoleteCount
+- HSDir3StoreRejectObsoleteCount
+- HSDir2StoreAddClientAuthCount
+- HSDir2StoreRejectExpiredHaveCachedClientAuthCount
+- HSDir2StoreRejectFutureHaveCachedClientAuthCount
+- HSDir2StoreRejectExpiredNoCachedClientAuthCount
+- HSDir2StoreRejectFutureNoCachedClientAuthCount
+- HSDir2StoreAddUpdatedClientAuthCount
+- HSDir2StoreClientAuthCount
+- HSDir2StoreRejectDuplicateClientAuthCount
+- HSDir2StoreRejectObsoleteClientAuthCount
+- HSDir2StoreAddNoClientAuthCount
+- HSDir2StoreRejectExpiredHaveCachedNoClientAuthCount
+- HSDir2StoreRejectFutureHaveCachedNoClientAuthCount
+- HSDir2StoreRejectExpiredNoCachedNoClientAuthCount
+- HSDir2StoreRejectFutureNoCachedNoClientAuthCount
+- HSDir2StoreAddUpdatedNoClientAuthCount
+- HSDir2StoreNoClientAuthCount
+- HSDir2StoreRejectDuplicateNoClientAuthCount
+- HSDir2StoreRejectObsoleteNoClientAuthCount
+- HSDir2StoreRejectNoClientAuthCount
+- HSDir2StoreAddNewNoClientAuthCount
+- HSDir2StoreRejectClientAuthCount
+- HSDir2StoreAddNewClientAuthCount
+- HSDir2StoreRejectCount
+- HSDir3StoreRejectCount
+- HSDir2StoreAddNewCount
+- HSDir3StoreAddNewCount
+
+### TODO: Category Name
+
+- HSDir2StoreAddUploadDelayTime
+- HSDir2StoreAddUpdatedUploadDelayTime
+- HSDir2StoreUploadDelayTime
+- HSDir2StoreRejectUploadDelayTime
+- HSDir2StoreAddNewUploadDelayTime
+
+### TODO: Category Name
+
+- HSDir2StoreAddIntroPointHistogram
+- HSDir2StoreIntroPointHistogram
+- HSDir2StoreRejectIntroPointHistogram
+- HSDir2StoreAddNewIntroPointHistogram
+
+### TODO: Category Name
+
+- HSDir2StoreAddIntroByteCount
+- HSDir3StoreAddIntroByteCount
+- HSDir2StoreAddUpdatedIntroByteCount
+- HSDir3StoreAddUpdatedIntroByteCount
+- HSDir2StoreIntroByteCount
+- HSDir3StoreIntroByteCount
+- HSDir2StoreClientAuthIntroByteCount
+- HSDir2StoreNoClientAuthIntroByteCount
+- HSDir2StoreRejectIntroByteCount
+- HSDir3StoreRejectIntroByteCount
+- HSDir2StoreAddNewIntroByteCount
+- HSDir3StoreAddNewIntroByteCount
+
+### TODO: Category Name
+
+- HSDir2StoreAddIntroByteHistogram
+- HSDir3StoreAddIntroByteHistogram
+- HSDir2StoreIntroByteHistogram
+- HSDir3StoreIntroByteHistogram
+- HSDir2StoreAddClientAuthIntroByteHistogram
+- HSDir2StoreClientAuthIntroByteHistogram
+- HSDir2StoreAddNoClientAuthIntroByteHistogram
+- HSDir2StoreNoClientAuthIntroByteHistogram
+- HSDir2StoreAddNewNoClientAuthIntroByteHistogram
+- HSDir2StoreAddNewClientAuthIntroByteHistogram
+- HSDir2StoreRejectIntroByteHistogram
+- HSDir3StoreRejectIntroByteHistogram
+- HSDir2StoreAddNewIntroByteHistogram
+- HSDir3StoreAddNewIntroByteHistogram
+
+### TODO: Category Name
+
+- HSDir2StoreAddDescriptorByteCount
+- HSDir3StoreAddDescriptorByteCount
+- HSDir2StoreAddUpdatedDescriptorByteCount
+- HSDir3StoreAddUpdatedDescriptorByteCount
+- HSDir2StoreDescriptorByteCount
+- HSDir3StoreDescriptorByteCount
+- HSDir2StoreClientAuthDescriptorByteCount
+- HSDir2StoreNoClientAuthDescriptorByteCount
+- HSDir2StoreRejectDescriptorByteCount
+- HSDir3StoreRejectDescriptorByteCount
+- HSDir2StoreAddNewDescriptorByteCount
+- HSDir3StoreAddNewDescriptorByteCount
+
+### TODO: Category Name
+
+- HSDir2StoreAddDescriptorByteHistogram
+- HSDir3StoreAddDescriptorByteHistogram
+- HSDir2StoreDescriptorByteHistogram
+- HSDir3StoreDescriptorByteHistogram
+- HSDir2StoreAddClientAuthDescriptorByteHistogram
+- HSDir2StoreClientAuthDescriptorByteHistogram
+- HSDir2StoreAddNoClientAuthDescriptorByteHistogram
+- HSDir2StoreNoClientAuthDescriptorByteHistogram
+- HSDir2StoreAddNewNoClientAuthDescriptorByteHistogram
+- HSDir2StoreAddNewClientAuthDescriptorByteHistogram
+- HSDir2StoreRejectDescriptorByteHistogram
+- HSDir3StoreRejectDescriptorByteHistogram
+- HSDir2StoreAddNewDescriptorByteHistogram
+- HSDir3StoreAddNewDescriptorByteHistogram
+
+### TODO: Category Name
+
+- HSDir3StoreAddRevisionHistogram
+- HSDir3StoreAddUpdatedRevisionHistogram
+- HSDir3StoreRevisionHistogram
+- HSDir3StoreRejectRevisionHistogram
+- HSDir3StoreAddNewRevisionHistogram
