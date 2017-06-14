@@ -337,11 +337,11 @@ It includes the following fields:
 Mandatory:
 * HiddenServiceVersionNumber
 * EventTimestamp
+* CacheReasonString
+* WasAddedToCacheFlag
 
 Optional:
 * HasExistingCacheEntryFlag (present if the descriptor was parsed successfully)
-* WasAddedToCacheFlag
-* FailureReasonString (present if the descriptor was not added to the cache)
 * EncodedIntroPointByteCount (present if descriptor was parsed successfully)
 * EncodedDescriptorByteCount (may be zero)
 
@@ -362,23 +362,34 @@ It has the following known issues:
 * PrivCount's additional RAM allocations may affect Tor's HSDir cache
   https://github.com/privcount/privcount/issues/349
 
-## PrivCount Event Field Detail
+## PrivCount Event Field Format
 
-Positional fields are a space-separated list of Data items. Fields MUST be
-located using their positions. Data MUST NOT contain spaces, newlines
-(C '\r' or '\n'), or NUL characters (C '\0'). Data SHOULD be encoded using
+### Positional Fields
+
+Positional fields are a space-separated list of Value items. Fields MUST be
+located using their positions. Value MUST NOT contain spaces, newlines
+(C '\r' or '\n'), or NUL characters (C '\0'). Value SHOULD be encoded using
 printable characters. New fields MUST NOT be added to existing events: this
 breaks older clients.
 
-Tagged fields are a space separated list of Name=Data pairs. Fields MUST be
+### Tagged Fields
+
+Tagged fields are a space separated list of Key=Value pairs. Fields MUST be
 located using their tag. Field positions MAY vary when other fields are
-optional, or when new fields are added in later PrivCount versions. Name and
-Data MUST NOT contain spaces, equals signs, newlines (C '\r' or '\n'), or NUL
-characters (C '\0'). Name SHOULD be a CamelCase ASCII identifier. Data SHOULD
-be encoded using printable characters. New fields SHOULD be added to the end
-of existing events, so that parsers that assume event order still work. Old
-fields SHOULD NOT be removed, so that parsers that assume event presence still
-work.
+optional, or when new fields are added in later PrivCount versions.
+
+Key and Value MUST NOT contain spaces, equals signs,
+newlines (C '\r' or '\n'), or NUL characters (C '\0'). Key MUST be at least
+one character, and SHOULD be a CamelCase ASCII identifier. Value SHOULD be
+encoded using printable characters, and MAY be zero-length. The '=' separator
+MUST always be present. Fields SHOULD be separated by a single space, and
+there SHOULD NOT be any spaces before the event's terminating newline.
+
+New fields SHOULD be added to the end of existing events, so that parsers that
+assume event order still work. Old fields SHOULD NOT be removed, so that
+parsers that assume event presence still work.
+
+## PrivCount Event Field Detail
 
 ### Channel ID
 
@@ -458,30 +469,15 @@ An integer giving the hidden service (HS) version. Current versions are:
 Hidden services are also known as onion services.
 This field is named after the HiddenServiceVersion torrc option.
 
-### HasExistingCacheEntryFlag
-A numeric boolean flag.
-True (1) if:
-* the DescriptorId (v2) or BlindedEd25519PublicKey (v3) was already in the
-  cache.
-False (0) if:
-* the Id or Key was not in the cache.
-Unknown (missing) if:
-* the descriptor was unparseable.
+### CacheReasonString
+An ASCII string that describes why the descriptor was added or rejected from
+the cache:
 
-PrivCount's additional RAM allocations may affect cache behaviour.
+Added to cache:
+* new: the descriptor is new in the cache,
+* updated: the descriptor replaced an existing descriptor in the cache,
 
-### WasAddedToCacheFlag
-A numeric boolean flag.
-True (1) if:
-* the descriptor was added to the cache.
-False (0) if:
-* the descriptor was not added to the cache, or
-* the descriptor was unparseable.
-
-PrivCount's additional RAM allocations may affect cache behaviour.
-
-### FailureReasonString
-An ASCII string that describes why the descriptor was not added to the cache:
+Not added to cache because:
 * obsolete: the DescriptorCreationTime was less than (v2) or
             RevisionNumber (v3) was less than or equal to the corresponding
             field in the descriptor that is already cached.
@@ -492,6 +488,34 @@ An ASCII string that describes why the descriptor was not added to the cache:
           (v2 only).
 * duplicate: the encoded descriptor body is identical to the encoded body for
              the currently cached descriptor (v2 only).
+
+v2 descriptors are cache keyed by DescriptorId, v3 descriptors are cache keyed
+by BlindedEd25519PublicKey.
+
+PrivCount's additional RAM allocations may affect cache behaviour.
+
+### HasExistingCacheEntryFlag
+A numeric boolean flag.
+True (1) if:
+* the DescriptorId (v2) or BlindedEd25519PublicKey (v3) was already in the
+  cache.
+False (0) if:
+* the Id or Key was not in the cache.
+Unknown (missing) if:
+* the descriptor was unparseable.
+
+v2 descriptors are cache keyed by DescriptorId, v3 descriptors are cache keyed
+by BlindedEd25519PublicKey.
+
+PrivCount's additional RAM allocations may affect cache behaviour.
+
+### WasAddedToCacheFlag
+A numeric boolean flag.
+True (1) if:
+* the descriptor was added to the cache.
+False (0) if:
+* the descriptor was not added to the cache, or
+* the descriptor was unparseable.
 
 PrivCount's additional RAM allocations may affect cache behaviour.
 
@@ -532,8 +556,11 @@ For details, see:
 https://gitweb.torproject.org/torspec.git/tree/proposals/224-rend-spec-ng.txt#n927
 
 ### DescriptorCreationTime
-The time that a descriptor was signed by the service. This is a unix epoch
-time (UTC) in seconds, to integer precision (no decimal places). (v2 only.)
+The time that a descriptor was created by the service (v2 only). Onion services
+round this value down to the nearest hour.
+
+This is a unix epoch time (UTC) in seconds, to integer precision
+(no decimal places).
 
 ### RequiresClientAuthFlag
 A numeric boolean flag (v2 only).
@@ -559,7 +586,7 @@ This is not the same as HiddenServiceVersionNumber.
 All current Tor versions advertise and support:
 * Intro version 2: no client authentication
 * Intro version 3: adds basic and stealth client authentication
-The equivalent bitfield value is 0x000c.
+So the bitfield value is always 0x000c (0xc in the event).
 
 Protocol versions 0 and 1 are no longer supported.
 
