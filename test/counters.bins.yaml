@@ -1,20 +1,13 @@
 # histograms represent a collection of counters (bins) that together define a
 # histogram
 
-# Files like this can be created:
-# using this script: (testing only)
-# (sort by reversed counter name, to sort similar suffixes together)
-# test/test_counter_match.sh | grep "^+" | cut -d+ -f2 | rev | sort | rev > missing_counters
-# (for counter in `cat missing_counters`;
-# do
-#     echo "    $counter:"
-#     echo "        bins:"
-#     echo "        - [-.inf, .inf]"
-# done) >> test/counters.noise.yaml
-# and then manually edit the multi-bin counters
+# Follow these steps to update this file:
+# 1. Add new counters to privcount/counter.py
+# 2. Run privcount/tools/add_counter.sh
+# 3. Manually add bins to the multi-bin counters
 # All Time, Ratio, and Histogram counters are multi-bin.
 # Some legacy Count counters are multi-bin, check the source or run the
-# injector test
+# injector test and look for the assertion failures.
 
 # when you modify the counters in this file, run:
 # test/test_counter_match.sh

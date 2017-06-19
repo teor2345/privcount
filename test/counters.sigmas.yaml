@@ -7,14 +7,9 @@
 # using the "sigma" elements of the "allocation" file output by the TS when
 # the config is loaded
 # (this second method requires an existing noise input file)
-# using this script: (testing only)
-# (sort by reversed counter name, to sort similar suffixes together)
-# test/test_counter_match.sh | grep "^+" | cut -d+ -f2 | rev | sort | rev > missing_counters
-# (for counter in `cat missing_counters`;
-# do
-#     echo "    $counter:"
-#     echo "        sigma: 0.0"
-# done) >> test/counters.noise.yaml
+# Or follow these steps to update this file: (testing only)
+# 1. Add new counters to privcount/counter.py
+# 2. Run privcount/tools/add_counter.sh
 
 # THESE NOISE CONFIGURATIONS OFFER ABSOLUTELEY NO PRIVACY AND SHOULD ONLY BE USED
 # FOR TESTING PURPOSES IN LOCAL PRIVATE NON-DEPLOYMENT SCENARIOS
