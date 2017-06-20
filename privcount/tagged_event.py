@@ -6,6 +6,10 @@
   See LICENSE for licensing information
 '''
 
+import logging
+
+from privcount.log import summarise_string
+
 def parse_tagged_event(event_field_list):
     '''
     Parse event_field_list from an event with tagged fields.
@@ -14,11 +18,14 @@ def parse_tagged_event(event_field_list):
 
     The list must not include the event code (650) or event type (PRIVCOUNT_*).
 
-    Returns a dictionary of Key: Value strings.
+    Returns a dictionary of Key: Value pairs, where Key and Value are both
+    strings. (To retrieve typed values, use the is_type_valid and
+    get_type_value functions.)
     Key must be at least one character, and '=' must be present, or the event
     is malformed.
     If there is no Value after the '=', result[Key] is a zero-length string.
     If any field is not in the correct format, returns an empty dictionary.
+
     '''
     result = dict()
     for field in event_field_list:
@@ -33,7 +40,7 @@ def parse_tagged_event(event_field_list):
                             .format(field))
             return dict()
         # split the field
-        key, eq, value = line.partition("=")
+        key, eq, value = field.partition("=")
         # validate the key, eq, and value
         # values must not contain =
         if '=' in value:
@@ -73,7 +80,7 @@ def is_field_valid(field_name, fields, event_desc,
     return True
 
 def is_string_valid(field_name, fields, event_desc,
-                    is_mandatory=False
+                    is_mandatory=False,
                     min_len=None, max_len=None):
     '''
     Check that fields[field_name] passes is_field_valid() and has a length
@@ -98,12 +105,66 @@ def is_string_valid(field_name, fields, event_desc,
         logging.warning("Ignored {} length {}: '{}', must be at least {} characters {}"
                         .format(field_name, field_len, field_value_log,
                                 min_len, event_desc))
+        logging.debug("Ignored {} length {} (full string): '{}', must be at least {} characters {}"
+                      .format(field_name, field_len, field_value,
+                              min_len, event_desc))
         # we can't process it
         return False
     if max_len is not None and field_len > max_len:
         logging.warning("Ignored {} length {}: '{}', must be at most {} characters {}"
                         .format(field_name, field_len, field_value_log,
                                 max_len, event_desc))
+        logging.debug("Ignored {} length {} (full string): '{}', must be at most {} characters {}"
+                      .format(field_name, field_len, field_value,
+                              max_len, event_desc))
+        # we can't process it
+        return False
+    # it is valid and we want to keep on processing
+    return True
+
+def is_list_valid(field_name, fields, event_desc,
+                  is_mandatory=False,
+                  min_count=None, max_count=None):
+    '''
+    Check that fields[field_name] passes is_field_valid(), and has between
+    min_count and max_count elements (inclusive). Use None for no count check.
+    
+    Assumes a zero-length value is a list with no items.
+
+    Don't pass floating-point values for min_count and max_count: they can
+    be inaccurate when compared with integer counts.
+
+    Return values are like is_string_valid.
+    '''
+    if not is_field_valid(field_name, fields, event_desc,
+                          is_mandatory=is_mandatory):
+        return False
+    if field_name not in fields:
+        # valid optional field, keep on processing
+        return True
+    field_value = fields[field_name]
+    field_value_log = summarise_string(field_value, 20)
+    # Assume a zero-length value is a list with no items
+    if len(field_value) > 0:
+        list_count = field_value.count(',') + 1
+    else:
+        list_count = 0
+    if min_count is not None and list_count < min_count:
+        logging.warning("Ignored {} '{}', must have at least {} items {}"
+                        .format(field_name, field_value_log, min_count,
+                                event_desc))
+        logging.debug("Ignored {} (full list) '{}', must have at least {} items {}"
+                      .format(field_name, field_value, min_count,
+                              event_desc))
+        # we can't process it
+        return False
+    if max_count is not None and list_count > max_count:
+        logging.warning("Ignored {} '{}', must have at most {} items {}"
+                        .format(field_name, field_value_log, max_count,
+                                event_desc))
+        logging.debug("Ignored {} (full list) '{}', must have at most {} items {}"
+                      .format(field_name, field_value, max_count,
+                              event_desc))
         # we can't process it
         return False
     # it is valid and we want to keep on processing
@@ -129,18 +190,18 @@ def is_int_valid(field_name, fields, event_desc,
         field_value = int(fields[field_name])
     except ValueError as e:
         # not an integer
-        logging.warning("Ignored {} {}, must be an integer: '{}' {}"
+        logging.warning("Ignored {} '{}', must be an integer: '{}' {}"
                         .format(field_name, fields[field_name], e,
                                 event_desc))
         return False
     if min_value is not None and field_value < min_value:
-        logging.warning("Ignored {} {}, must be at least {} {}"
+        logging.warning("Ignored {} '{}', must be at least {} {}"
                         .format(field_name, field_value, min_value,
                                 event_desc))
         # we can't process it
         return False
     if max_value is not None and field_value > max_value:
-        logging.warning("Ignored {} {}, must be at most {} {}"
+        logging.warning("Ignored {} '{}', must be at most {} {}"
                         .format(field_name, field_value, max_value,
                                 event_desc))
         # we can't process it
@@ -167,9 +228,9 @@ def is_float_valid(field_name, fields, event_desc,
     float (includes integral values), and is between min_value and
     max_value (inclusive). Use None for no range check.
 
-    Don't pass integer values for min_value and max_value: they can
-    be inaccurate when compared with floating-point. Also be careful passing
-    Inf, it may not do what you want. None is much more reliable.
+    Floating-point values can be inaccurate when compared: if you want equal
+    values to be included, use a slightly larger range. Don't use Inf to skip
+    a range check, it may not do what you want. None is much more reliable.
 
     Return values are like is_string_valid.
     '''
@@ -183,18 +244,18 @@ def is_float_valid(field_name, fields, event_desc,
         field_value = float(fields[field_name])
     except ValueError as e:
         # not a float
-        logging.warning("Ignored {} {}, must be a float: '{}' {}"
+        logging.warning("Ignored {} '{}', must be a float: '{}' {}"
                         .format(field_name, fields[field_name], e,
                                 event_desc))
         return False
     if min_value is not None and field_value < min_value:
-        logging.warning("Ignored {} {}, must be at least {} {}"
+        logging.warning("Ignored {} '{}', must be at least {} {}"
                         .format(field_name, field_value, min_value,
                                 event_desc))
         # we can't process it
         return False
     if max_value is not None and field_value > max_value:
-        logging.warning("Ignored {} {}, must be at most {} {}"
+        logging.warning("Ignored {} '{}', must be at most {} {}"
                         .format(field_name, field_value, max_value,
                                 event_desc))
         # we can't process it
@@ -217,10 +278,36 @@ def get_string_value(field_name, fields, event_desc,
         return None
 
     # This should have been checked earlier
-    # There are no string checks, but we do this for consistency
+    # There are no non-length string checks, but we do this for consistency
     assert is_string_valid(field_name, fields, event_desc)
 
     return fields[field_name]
+
+def get_list_value(field_name, fields, event_desc,
+                   is_mandatory=False):
+    '''
+    Check that fields[field_name] exists.
+    Asserts if is_mandatory is True and it does not exist.
+
+    If it does exist, return it as a list of strings, splitting on commas.
+    If the field is a zero-length string, returns a list with no items.
+    If the field is missing, return None.
+    (There are no invalid lists.)
+    '''
+    if field_name not in fields:
+        assert not is_mandatory
+        return None
+
+    # This should have been checked earlier
+    # There are no non-count list checks, but we do this for consistency
+    assert is_list_valid(field_name, fields, event_desc)
+
+    field_value = fields[field_name]
+    # Assume a zero-length value is a list with no items
+    if len(field_value) > 0:
+        return field_value.split(',')
+    else:
+        return []
 
 def get_int_value(field_name, fields, event_desc,
                   is_mandatory=False):

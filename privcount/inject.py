@@ -238,6 +238,8 @@ class PrivCountDataInjector(ServerFactory):
             # _flush_later will inject the next event when called
             return
 
+    TIMESTAMP_TAG = "EventTimestamp"
+
     def _get_event_times(self, msg):
         '''
         Return a tuple (start_time, end_time) for the event in msg.
@@ -269,9 +271,10 @@ class PrivCountDataInjector(ServerFactory):
                                 .format(msg, event_desc))
             else:
                 # PRIVCOUNT_HSDIR_CACHE_STORED has a single event time
-                event_time = get_float_value("EventTimestamp",
-                                             fields, event_desc,
-                                             is_mandatory=True)
+                event_time = get_float_value(
+                                          PrivCountDataInjector.TIMESTAMP_TAG,
+                                          fields, event_desc,
+                                          is_mandatory=True)
                 return event_time, event_time
         else:
             logging.warning("Wrong event field count or unknown or empty event in: '{}' {}"
@@ -281,7 +284,7 @@ class PrivCountDataInjector(ServerFactory):
     def _set_event_times(self, msg, start_time, end_time):
         '''
         Set the event times in msg to start_time and end_time, and return
-        the modified event.
+        the modified event. May change the field order of tagged events.
         '''
         parts = msg.split()
         if len(parts) > 0:
@@ -310,7 +313,10 @@ class PrivCountDataInjector(ServerFactory):
                                 .format(msg, event_desc))
             else:
                 # PRIVCOUNT_HSDIR_CACHE_STORED has a single event time
-                fields["EventTimestamp"] = str(end_time)
+                fields[PrivCountDataInjector.TIMESTAMP_TAG] = str(end_time)
+                # This reorders the fields in key hash order
+                # This is not a stable order: it may change between python
+                # versions
                 fields_list = ["{}={}".format(k, fields[k]) for k in fields]
                 parts_list = [parts[0]] + fields_list
                 return ' '.join(parts_list)

@@ -22,7 +22,7 @@ from privcount.crypto import get_public_digest_string, load_public_key_string, e
 from privcount.log import log_error, format_delay_time_wait, format_last_event_time_since, format_elapsed_time_since, errorCallback, summarise_string
 from privcount.node import PrivCountClient, EXPECTED_EVENT_INTERVAL_MAX, EXPECTED_CONTROL_ESTABLISH_MAX
 from privcount.protocol import PrivCountClientProtocol, TorControlClientProtocol, get_privcount_version
-from privcount.tagged_event import parse_tagged_event, is_string_valid, is_int_valid, is_flag_valid, is_float_valid, get_string_value, get_int_value, get_flag_value, get_float_value
+from privcount.tagged_event import parse_tagged_event, is_string_valid, is_list_valid, is_int_valid, is_flag_valid, is_float_valid, get_string_value, get_list_value, get_int_value, get_flag_value, get_float_value
 from privcount.traffic_model import TrafficModel, check_traffic_model_config
 
 SINGLE_BIN = SecureCounters.SINGLE_BIN
@@ -815,32 +815,42 @@ class Aggregator(ReconnectingClientFactory):
             if len(items) == Aggregator.STREAM_BYTES_ITEMS:
                 return self._handle_bytes_event(items[:Aggregator.STREAM_BYTES_ITEMS])
             else:
+                logging.warning("Rejected malformed {} event"
+                                .format(event_code))
                 return False
 
         elif event_code == 'PRIVCOUNT_STREAM_ENDED':
             if len(items) == Aggregator.STREAM_ENDED_ITEMS:
                 return self._handle_stream_event(items[:Aggregator.STREAM_ENDED_ITEMS])
             else:
+                logging.warning("Rejected malformed {} event"
+                                .format(event_code))
                 return False
 
         elif event_code == 'PRIVCOUNT_CIRCUIT_ENDED':
             if len(items) == Aggregator.CIRCUIT_ENDED_ITEMS:
                 return self._handle_circuit_event(items[:Aggregator.CIRCUIT_ENDED_ITEMS])
             else:
+                logging.warning("Rejected malformed {} event"
+                                .format(event_code))
                 return False
 
         elif event_code == 'PRIVCOUNT_CONNECTION_ENDED':
             if len(items) == Aggregator.CONNECTION_ENDED_ITEMS:
                 return self._handle_connection_event(items[:Aggregator.CONNECTION_ENDED_ITEMS])
             else:
+                logging.warning("Rejected malformed {} event"
+                                .format(event_code))
                 return False
 
         # these events have tagged fields: fields may be optional
         elif event_code == 'PRIVCOUNT_HSDIR_CACHE_STORED':
             fields = parse_tagged_event(items)
-            # malformed
+            # malformed: handle by warning and ignoring
             if len(items) > 0 and len(fields) == 0:
-                return False
+                logging.warning("Ignored malformed {} event"
+                                .format(event_code))
+                return True
             else:
                 return self._handle_hsdir_stored_event(fields)
 
@@ -1287,7 +1297,7 @@ class Aggregator(ReconnectingClientFactory):
         See is_hs_version_valid for details.
         '''
         # This should have been checked earlier
-        assert Aggregator.is_hs_version_valid(fields, event_desc):
+        assert Aggregator.is_hs_version_valid(fields, event_desc)
 
         return get_int_value("HiddenServiceVersionNumber",
                              fields, event_desc,
@@ -1296,49 +1306,30 @@ class Aggregator(ReconnectingClientFactory):
     @staticmethod
     def is_allowed_version_valid(field_name, fields, event_desc,
                                  allowed_version=None):
-    '''
-    If allowed_version is not None, check if fields[field_name] exists,
-    and if allowed_version is the same as the hidden service version.
-    If it is not, return False and log a warning using event_desc.
-
-    Otherwise, return True (the event should be processed).
-    '''
-    if allowed_version is None:
-        # No version check
-        return True
-
-    assert allowed_version == 2 or allowed_version == 3
-
-    hs_version = Aggregator.get_hs_version(fields, event_desc)
-
-    # this should have been checked earlier
-    assert hs_version == 2 or hs_version == 3
-
-    if hs_version != allowed_version and field_name in fields:
-        logging.warning("Ignored unexpected v{} {} {}"
-                        .format(hs_version, field_name, event_desc))
-        return False
-
-    return True
-
-    @staticmethod
-    def is_intro_point_count_valid(fields, event_desc):
         '''
-        If fields["IntroPointCount"] exists, checks that it is below the
-        expected maximum.
-        See is_int_valid for details.
+        If allowed_version is not None, check if fields[field_name] exists,
+        and if allowed_version is the same as the hidden service version.
+        If it is not, return False and log a warning using event_desc.
+
+        Otherwise, return True (the event should be processed).
         '''
-        # Version 3 always has intro points encrypted
-        if not Aggregator.is_allowed_version_valid("IntroPointCount",
-                                                   fields, event_desc,
-                                                   allowed_version=2):
+        if allowed_version is None:
+            # No version check
+            return True
+
+        assert allowed_version == 2 or allowed_version == 3
+
+        hs_version = Aggregator.get_hs_version(fields, event_desc)
+
+        # this should have been checked earlier
+        assert hs_version == 2 or hs_version == 3
+
+        if hs_version != allowed_version and field_name in fields:
+            logging.warning("Ignored unexpected v{} {} {}"
+                            .format(hs_version, field_name, event_desc))
             return False
 
-        return is_int_valid("IntroPointCount",
-                            fields, event_desc,
-                            is_mandatory=False,
-                            min_value=0,
-                            max_value=10)
+        return True
 
     @staticmethod
     def is_descriptor_byte_count_valid(field_name, fields, event_desc):
@@ -1369,11 +1360,24 @@ class Aggregator(ReconnectingClientFactory):
     def warn_unexpected_field_value(field_name, fields, event_desc):
         '''
         Called when we expect field_name to be a particular value, and it is
-        not. Log a warning containing field_name, fields[field_name], and
-        event_desc.
+        not. Log a warning containing field_name, fields[field_name]
+        (if available), and event_desc.
         '''
-        logging.warning("Unexpected {} value '{}' {}. Maybe we should add a counter for it?"
-                        .format(field_name, fields[field_name], event_desc))
+        if field_name in fields:
+            field_value = fields[field_name]
+            field_value_log = summarise_string(field_value, 20)
+            value_message = "{} value '{}'".format(field_name,
+                                                   field_value_log)
+            full_value_message = "{} value (full value) '{}'".format(
+                                                                  field_name,
+                                                                  field_value)
+        else:
+            value_message = "missing {} value".format(field_name)
+            full_value_message = value_message
+        logging.warning("Unexpected {} {}. Maybe we should add a counter for it?"
+                        .format(value_message, event_desc))
+        logging.debug("Unexpected {} {}. Maybe we should add a counter for it?"
+                      .format(full_value_message, event_desc))
 
     @staticmethod
     def warn_unknown_counter(counter_name, origin_desc, event_desc):
@@ -1411,7 +1415,7 @@ class Aggregator(ReconnectingClientFactory):
         # Check the cache flags
 
         if not is_flag_valid("HasExistingCacheEntryFlag",
-                             fields, event_desc
+                             fields, event_desc,
                              is_mandatory=False):
             return False
 
@@ -1442,14 +1446,28 @@ class Aggregator(ReconnectingClientFactory):
 
         # Check the v2 fields
 
-        if not Aggregator.is_intro_point_count_valid(fields, event_desc):
+        if not is_int_valid("IntroPointCount",
+                            fields, event_desc,
+                            is_mandatory=False,
+                            min_value=0,
+                            max_value=10):
             return False
+
+        # Version 3 always has intro points encrypted
+        if not Aggregator.is_allowed_version_valid("IntroPointCount",
+                                                   fields, event_desc,
+                                                   allowed_version=2):
+            return False
+
+        intro_count = get_int_value("IntroPointCount",
+                                    fields, event_desc,
+                                    is_mandatory=False)
 
         # Version 3 always has intro points encrypted, so we can't tell if it
         # uses client auth
         if not is_flag_valid("RequiresClientAuthFlag",
-                             is_mandatory=False,
-                             fields, event_desc):
+                             fields, event_desc,
+                             is_mandatory=False):
             return False
         if not Aggregator.is_allowed_version_valid("RequiresClientAuthFlag",
                                                    fields, event_desc,
@@ -1460,7 +1478,7 @@ class Aggregator(ReconnectingClientFactory):
         if not is_float_valid("DescriptorCreationTime",
                               fields, event_desc,
                               is_mandatory=False,
-                              min_value=0.0)
+                              min_value=0.0):
             return False
         if not Aggregator.is_allowed_version_valid("DescriptorCreationTime",
                                                    fields, event_desc,
@@ -1485,12 +1503,19 @@ class Aggregator(ReconnectingClientFactory):
         # keep processing the event.
 
         # Is v2 SupportedProtocolBitfield 0xc (1 << 2 + 1 << 3)?
-        const_bitfield = 0xc
-        if not is_int_valid("SupportedProtocolBitfield",
-                            fields, event_desc,
-                            is_mandatory=False,
-                            min_value=const_bitfield,
-                            max_value=const_bitfield):
+        const_bitfield_str = '0xc'
+        const_bitfield_strlen = len(const_bitfield_str)
+        if not is_string_valid("SupportedProtocolBitfield",
+                               fields, event_desc,
+                               is_mandatory=False,
+                               min_len=const_bitfield_strlen,
+                               max_len=const_bitfield_strlen):
+            Aggregator.warn_unexpected_field_value("SupportedProtocolBitfield",
+                                                   fields, event_desc)
+        bitfield_str = get_string_value("SupportedProtocolBitfield",
+                                        fields, event_desc,
+                                        is_mandatory=False)
+        if bitfield_str is not None and bitfield_str != const_bitfield_str:
             Aggregator.warn_unexpected_field_value("SupportedProtocolBitfield",
                                                    fields, event_desc)
         if not Aggregator.is_allowed_version_valid("SupportedProtocolBitfield",
@@ -1498,12 +1523,42 @@ class Aggregator(ReconnectingClientFactory):
                                                    allowed_version=2):
             return False
 
+        # Is the number of fingerprints the same as the intro point count?
+        if not is_list_valid("IntroPointFingerprintList",
+                             fields, event_desc,
+                             is_mandatory=False,
+                             min_count=0,
+                             max_count=10):
+            Aggregator.warn_unexpected_field_value("IntroPointFingerprintList",
+                                                   fields, event_desc)
+
+        # Version 3 always has intro points encrypted
+        if not Aggregator.is_allowed_version_valid("IntroPointFingerprintList",
+                                                   fields, event_desc,
+                                                   allowed_version=2):
+            return False
+
+        # That's not quite enough, we need to check the values are equal
+        intro_list = get_list_value("IntroPointFingerprintList",
+                                    fields, event_desc,
+                                    is_mandatory=False)
+        if intro_count is None and intro_list is None:
+            # that's ok
+            pass
+        elif intro_count is None or intro_list is None:
+            # Both should be None, or neither should be None
+            Aggregator.warn_unexpected_field_value("IntroPointFingerprintList",
+                                                   fields, event_desc)
+        elif intro_count != len(intro_list):
+            # Count mismatch
+            Aggregator.warn_unexpected_field_value("IntroPointFingerprintList",
+                                                   fields, event_desc)
+
         # Is v3 DescriptorLifetime 3 hours?
         const_lifetime = 3*60*60
         if not is_int_valid("DescriptorLifetime",
-                            is_mandatory=False,
-                            allowed_version=3,
                             fields, event_desc,
+                            is_mandatory=False,
                             min_value=const_lifetime,
                             max_value=const_lifetime):
             Aggregator.warn_unexpected_field_value("DescriptorLifetime",
@@ -1532,14 +1587,14 @@ class Aggregator(ReconnectingClientFactory):
         # Validate the mandatory cache fields
 
         # 50 is an arbitrary limit, the current maximum is 11 characters
-        if not is_string_valid("CacheActionString",
+        if not is_string_valid("CacheReasonString",
                                fields, event_desc,
                                is_mandatory=True,
                                min_len=1,
                                max_len=50):
             return False
 
-        action_str = get_string_value("CacheActionString",
+        reason_str = get_string_value("CacheReasonString",
                                       fields, event_desc,
                                       is_mandatory=True)
 
@@ -1554,37 +1609,38 @@ class Aggregator(ReconnectingClientFactory):
                                       fields, event_desc,
                                       is_mandatory=False)
 
-        # Some CacheActionStrings must have HasExistingCacheEntryFlag
-        if action_str == "Expired" or action_str == "Future":
+        # Some CacheReasonStrings must have HasExistingCacheEntryFlag
+        if reason_str == "Expired" or reason_str == "Future":
             assert hs_version == 2 or hs_version == 3
             if hs_version != 2:
-                logging.warning("Ignored CacheActionString {} with HiddenServiceVersionNumber {}, HiddenServiceVersionNumber must be 2 {}"
-                              .format(action_str, hs_version, event_desc))
+                logging.warning("Ignored CacheReasonString {} with HiddenServiceVersionNumber {}, HiddenServiceVersionNumber must be 2 {}"
+                              .format(reason_str, hs_version, event_desc))
                 return False
             if has_existing is None:
-                logging.warning("Ignored CacheActionString {} with HasExistingCacheEntryFlag None, HasExistingCacheEntryFlag must be 1 or 0 {}"
-                                .format(action_str, event_desc))
+                logging.warning("Ignored CacheReasonString {} with HasExistingCacheEntryFlag None, HasExistingCacheEntryFlag must be 1 or 0 {}"
+                                .format(reason_str, event_desc))
                 return False
 
         # if everything passed, we're ok
         return True
 
     def _increment_hsdir_stored_counters(self, counter_suffix, hs_version,
-                                         action_str, was_added, has_existing,
+                                         reason_str, was_added, has_existing,
                                          has_client_auth,
+                                         event_desc,
                                          bin=SINGLE_BIN,
                                          inc=1,
                                          log_missing_counters=True):
         '''
         Increment bin by inc for the set of counters ending in
-        counter_suffix, using hs_version, action_str, was_added,
+        counter_suffix, using hs_version, reason_str, was_added,
         has_existing, and has_client_auth to create the counter names.
         If log_missing_counters, warn the operator when a requested counter
         is not in the table in counters.py. Otherwise, unknown names are
         ignored.
         '''
-        # create counter names from version, action_str and was_added
-        action_str = action_str.title()
+        # create counter names from version, reason_str and was_added
+        reason_str = reason_str.title()
         added_str = "Add" if was_added else "Reject"
 
         store_counter = "HSDir{}Store{}".format(hs_version,
@@ -1599,26 +1655,26 @@ class Aggregator(ReconnectingClientFactory):
             auth_counter = "HSDir{}Store{}{}".format(hs_version,
                                                      auth_str,
                                                      counter_suffix)
-            added_auth_counter = "HSDir{}Store{}{}".format(hs_version,
-                                                           added_str,
-                                                           auth_str,
-                                                           counter_suffix)
+            added_auth_counter = "HSDir{}Store{}{}{}".format(hs_version,
+                                                             added_str,
+                                                             auth_str,
+                                                             counter_suffix)
         # based on added_counter
-        if action_str == "Expired" or action_str == "Future":
+        if reason_str == "Expired" or reason_str == "Future":
             # v2 only: we checked in are_hsdir_stored_fields_valid()
             assert hs_version == 2
             assert has_existing is not None
-            assert has_client_auth is not None:
+            assert has_client_auth is not None
             existing_str = "HaveCached" if has_existing else "NoCached"
             action_counter = "HSDir{}Store{}{}{}{}".format(hs_version,
                                                            added_str,
-                                                           action_str,
+                                                           reason_str,
                                                            existing_str,
                                                            counter_suffix)
             action_auth_counter = "HSDir{}Store{}{}{}{}{}".format(
                                                                 hs_version,
                                                                 added_str,
-                                                                action_str,
+                                                                reason_str,
                                                                 existing_str,
                                                                 auth_str,
                                                                 counter_suffix)
@@ -1627,16 +1683,16 @@ class Aggregator(ReconnectingClientFactory):
             # descriptor. See doc/CounterDefinitions.markdown for details.
             action_counter = "HSDir{}Store{}{}{}".format(hs_version,
                                                          added_str,
-                                                         action_str,
+                                                         reason_str,
                                                          counter_suffix)
             if has_client_auth is not None:
                 # v2 only: we checked in are_hsdir_stored_fields_valid()
                 assert hs_version == 2
-                assert has_client_auth is not None:
+                assert has_client_auth is not None
                 action_auth_counter = "HSDir{}Store{}{}{}{}".format(
                                                                 hs_version,
                                                                 added_str,
-                                                                action_str,
+                                                                reason_str,
                                                                 auth_str,
                                                                 counter_suffix)
 
@@ -1649,7 +1705,7 @@ class Aggregator(ReconnectingClientFactory):
             Aggregator.warn_unknown_counter(added_counter,
                                             added_origin,
                                             event_desc)
-            action_origin = "CacheActionString and HasExistingCacheEntryFlag and {}".format(counter_suffix)
+            action_origin = "CacheReasonString and HasExistingCacheEntryFlag and {}".format(counter_suffix)
             Aggregator.warn_unknown_counter(action_counter,
                                             action_origin,
                                             event_desc)
@@ -1666,7 +1722,7 @@ class Aggregator(ReconnectingClientFactory):
                 Aggregator.warn_unknown_counter(added_auth_counter,
                                                 added_auth_origin,
                                                 event_desc)
-                action_auth_origin = "CacheActionString and HasExistingCacheEntryFlag and RequiresClientAuthFlag and {}".format(counter_suffix)
+                action_auth_origin = "CacheReasonString and HasExistingCacheEntryFlag and RequiresClientAuthFlag and {}".format(counter_suffix)
                 Aggregator.warn_unknown_counter(action_auth_counter,
                                                 action_auth_origin,
                                                 event_desc)
@@ -1703,11 +1759,11 @@ class Aggregator(ReconnectingClientFactory):
         Fields used:
         Common:
           HiddenServiceVersionNumber, EventTimestamp,
-          CacheActionString, HasExistingCacheEntryFlag, WasAddedToCacheFlag,
+          CacheReasonString, HasExistingCacheEntryFlag, WasAddedToCacheFlag,
           EncodedDescriptorByteCount, EncodedIntroPointByteCount
         v2:
           DescriptorCreationTime, SupportedProtocolBitfield,
-          RequiresClientAuthFlag, IntroPointCount
+          RequiresClientAuthFlag, IntroPointCount, IntroPointFingerprintList
         v3:
           RevisionNumber, DescriptorLifetime
         See doc/TorEvents.markdown for all field names and definitions.
@@ -1717,10 +1773,8 @@ class Aggregator(ReconnectingClientFactory):
         '''
         event_desc = "in PRIVCOUNT_HSDIR_CACHE_STORED event"
 
-        is_valid = Aggregator.are_hsdir_stored_fields_valid(fields,
-                                                            event_desc)
-        if not is_valid:
-            # we handled the event by ignoring it as invalid
+        if not Aggregator.are_hsdir_stored_fields_valid(fields, event_desc):
+            # handle the event by warning (in the validator) and ignoring it
             return True
 
         # Extract mandatory fields
@@ -1728,7 +1782,7 @@ class Aggregator(ReconnectingClientFactory):
         event_ts = get_float_value("EventTimestamp",
                                    fields, event_desc,
                                    is_mandatory=True)
-        action_str = get_string_value("CacheActionString",
+        reason_str = get_string_value("CacheReasonString",
                                       fields, event_desc,
                                       is_mandatory=True)
         was_added = get_flag_value("WasAddedToCacheFlag",
@@ -1767,10 +1821,11 @@ class Aggregator(ReconnectingClientFactory):
         # These are the base counters that cover all the upload cases
         self._increment_hsdir_stored_counters("Count",
                                               hs_version,
-                                              action_str,
+                                              reason_str,
                                               was_added,
                                               has_existing,
                                               has_client_auth,
+                                              event_desc,
                                               bin=SINGLE_BIN,
                                               inc=1,
                                               log_missing_counters=True)
@@ -1780,38 +1835,42 @@ class Aggregator(ReconnectingClientFactory):
         if intro_bytes is not None:
             self._increment_hsdir_stored_counters("IntroByteCount",
                                                   hs_version,
-                                                  action_str,
+                                                  reason_str,
                                                   was_added,
                                                   has_existing,
                                                   has_client_auth,
+                                                  event_desc,
                                                   bin=SINGLE_BIN,
                                                   inc=intro_bytes,
                                                   log_missing_counters=False)
             self._increment_hsdir_stored_counters("IntroByteHistogram",
                                                   hs_version,
-                                                  action_str,
+                                                  reason_str,
                                                   was_added,
                                                   has_existing,
                                                   has_client_auth,
+                                                  event_desc,
                                                   bin=intro_bytes,
                                                   inc=1,
                                                   log_missing_counters=False)
         if desc_bytes is not None:
             self._increment_hsdir_stored_counters("DescriptorByteCount",
                                                   hs_version,
-                                                  action_str,
+                                                  reason_str,
                                                   was_added,
                                                   has_existing,
                                                   has_client_auth,
+                                                  event_desc,
                                                   bin=SINGLE_BIN,
                                                   inc=desc_bytes,
                                                   log_missing_counters=False)
             self._increment_hsdir_stored_counters("DescriptorByteHistogram",
                                                   hs_version,
-                                                  action_str,
+                                                  reason_str,
                                                   was_added,
                                                   has_existing,
                                                   has_client_auth,
+                                                  event_desc,
                                                   bin=desc_bytes,
                                                   inc=1,
                                                   log_missing_counters=False)
@@ -1825,10 +1884,11 @@ class Aggregator(ReconnectingClientFactory):
             # to add rejection counters, their names to the list in counter.py
             self._increment_hsdir_stored_counters("IntroPointHistogram",
                                                   hs_version,
-                                                  action_str,
+                                                  reason_str,
                                                   was_added,
                                                   has_existing,
                                                   has_client_auth,
+                                                  event_desc,
                                                   bin=intro_count,
                                                   inc=1,
                                                   log_missing_counters=False)
@@ -1839,10 +1899,11 @@ class Aggregator(ReconnectingClientFactory):
             delay_time = event_ts - create_time
             self._increment_hsdir_stored_counters("UploadDelayTime",
                                                   hs_version,
-                                                  action_str,
+                                                  reason_str,
                                                   was_added,
                                                   has_existing,
                                                   has_client_auth,
+                                                  event_desc,
                                                   bin=delay_time,
                                                   inc=1,
                                                   log_missing_counters=False)
@@ -1854,13 +1915,16 @@ class Aggregator(ReconnectingClientFactory):
             assert hs_version == 3
             self._increment_hsdir_stored_counters("RevisionHistogram",
                                                   hs_version,
-                                                  action_str,
+                                                  reason_str,
                                                   was_added,
                                                   has_existing,
                                                   has_client_auth,
+                                                  event_desc,
                                                   bin=revision_num,
                                                   inc=1,
                                                   log_missing_counters=False)
+        # we processed and handled the event
+        return True
 
     def _do_rotate(self):
         '''
