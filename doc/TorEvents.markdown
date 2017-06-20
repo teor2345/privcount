@@ -386,6 +386,11 @@ New fields SHOULD be added to the end of existing events, so that parsers that
 assume event order still work. Old fields SHOULD NOT be removed, so that
 parsers that assume event presence still work.
 
+Values that are lists SHOULD use comma as a separator. An empty value is an
+ambiguous list: it can mean a list with 0 items (an empty list), or a list
+containing a single empty string. Currently, all events and client code
+assume it is an empty list.
+
 ## PrivCount Event Field Detail
 
 ### Channel ID
@@ -618,9 +623,19 @@ should be interpreted carefully.
 
 ### IntroPointCount
 An unsigned integer count of introduction points in the descriptor. Only
-available for v2 descriptors with RequiresClientAuthFlag 0.
+available for v2 descriptors with RequiresClientAuthFlag 0. Also missing if the
+descriptor or intro point section are unparseable.
 
 v2 descriptors can have between 0 and 10 introduction points.
+
+### IntroPointFingerprintList
+A comma-separated list of the introduction point relay fingerprints in the
+descriptor. Each fingerprint is the SHA-1 hash of the relay's public RSA key.
+
+If there are zero introduction points, this key is present, and the value is an
+empty string. This represents an empty list.
+
+If the IntroPointCount is missing, this key will also be missing.
 
 ### EncodedIntroPointByteCount
 An unsigned integer count of bytes in the encoded form of the intro point
