@@ -30,7 +30,7 @@ grep -i "^ *$NAME_REGEX:$" "$TEST_DIR/traffic.noise.yaml" \
 # Process the test counter files
 for counters in "$TEST_DIR"/counters.{bins,noise,sigmas}.yaml; do
     #echo "Processing $counters:"
-    grep -i "$NAME_REGEX:$" "$counters" \
+    grep -i "^[ \t]*$NAME_REGEX:$" "$counters" \
         | grep -v -e '^#' -e 'bins:' -e 'privacy:' -e 'counters:' \
         | tr -d " \t:" > "$counters.names.unsorted"
     # The traffic model bins are automatic, and they don't support sigmas
