@@ -1551,12 +1551,13 @@ counters:
         - [30721, 40961]
         - [40961, 51201]
         - [51201,  .inf] # Over-size descriptors: should be rejected, check the HSV3MaxDescriptorSize consensus parameter
-    # Each HSv3 Descriptor is updated for ~36 hours (due to a 12 hour overlap
-    # in each 24 hour time period). Descriptors are uploaded at least every
-    # 3 hours.
+    # Each HSv3 Descriptor is updated for up to 36 hours (each SRV expires 36
+    # hours after the service first sees it in a consensus, and new SRVs are
+    # created every 24 hours). Descriptors are uploaded at least every 1-2
+    # hours, and expire after 3 hours.
     HSDir3StoreAddRevisionHistogram:
         bins:
-        - [ 0,  1] # Capture each per-expiry period revision separately
+        - [ 0,  1] # Descriptors for new or restarted services
         - [ 1,  2]
         - [ 2,  3]
         - [ 3,  4]
@@ -1568,17 +1569,39 @@ counters:
         - [ 9, 10]
         - [10, 11]
         - [11, 12]
-        - [12, 24] # Descriptor was updated 1x-2x per 3 hour expiry period
-        - [24, 36]
-        - [36, 48]
-        - [48, 60]
-        - [60, 72]
-        - [72, 84]
-        - [84, 96] # Descriptor was updated 7x-8x per 3 hour expiry period
-        - [96, .inf] # Descriptor was updated more than 8x per 3 hour expiry period
+        - [12, 13]
+        - [13, 14]
+        - [14, 15]
+        - [15, 16]
+        - [16, 17]
+        - [17, 18] # Descriptors updated every 2 hours
+        - [18, 19]
+        - [19, 20]
+        - [20, 21]
+        - [21, 22]
+        - [22, 23]
+        - [23, 24]
+        - [24, 25]
+        - [25, 26]
+        - [26, 27]
+        - [27, 28]
+        - [28, 29]
+        - [29, 30]
+        - [30, 31]
+        - [31, 32]
+        - [32, 33]
+        - [33, 34]
+        - [34, 35]
+        - [35, 36] # Descriptors updated every hour
+        - [36, 72] # Descriptors updated twice every hour
+        - [72, 96] # Descriptors updated 3x every hour
+        - [96, 108] # Descriptors updated 4x every hour
+        - [108, 144] # Descriptors updated 5x every hour
+        - [144, 180] # Descriptors updated 6x every hour
+        - [180, .inf] # Descriptors updated >6x every hour
     HSDir3StoreAddUpdatedRevisionHistogram:
         bins:
-        - [ 0,  1] # Capture each per-expiry period revision separately
+        - [ 0,  1] # Descriptors for new or restarted services
         - [ 1,  2]
         - [ 2,  3]
         - [ 3,  4]
@@ -1590,17 +1613,39 @@ counters:
         - [ 9, 10]
         - [10, 11]
         - [11, 12]
-        - [12, 24] # Descriptor was updated 1x-2x per 3 hour expiry period
-        - [24, 36]
-        - [36, 48]
-        - [48, 60]
-        - [60, 72]
-        - [72, 84]
-        - [84, 96] # Descriptor was updated 7x-8x per 3 hour expiry period
-        - [96, .inf] # Descriptor was updated more than 8x per 3 hour expiry period
+        - [12, 13]
+        - [13, 14]
+        - [14, 15]
+        - [15, 16]
+        - [16, 17]
+        - [17, 18] # Descriptors updated every 2 hours
+        - [18, 19]
+        - [19, 20]
+        - [20, 21]
+        - [21, 22]
+        - [22, 23]
+        - [23, 24]
+        - [24, 25]
+        - [25, 26]
+        - [26, 27]
+        - [27, 28]
+        - [28, 29]
+        - [29, 30]
+        - [30, 31]
+        - [31, 32]
+        - [32, 33]
+        - [33, 34]
+        - [34, 35]
+        - [35, 36] # Descriptors updated every hour
+        - [36, 72] # Descriptors updated twice every hour
+        - [72, 96] # Descriptors updated 3x every hour
+        - [96, 108] # Descriptors updated 4x every hour
+        - [108, 144] # Descriptors updated 5x every hour
+        - [144, 180] # Descriptors updated 6x every hour
+        - [180, .inf] # Descriptors updated >6x every hour
     HSDir3StoreRevisionHistogram:
         bins:
-        - [ 0,  1] # Capture each per-expiry period revision separately
+        - [ 0,  1] # Descriptors for new or restarted services
         - [ 1,  2]
         - [ 2,  3]
         - [ 3,  4]
@@ -1612,17 +1657,39 @@ counters:
         - [ 9, 10]
         - [10, 11]
         - [11, 12]
-        - [12, 24] # Descriptor was updated 1x-2x per 3 hour expiry period
-        - [24, 36]
-        - [36, 48]
-        - [48, 60]
-        - [60, 72]
-        - [72, 84]
-        - [84, 96] # Descriptor was updated 7x-8x per 3 hour expiry period
-        - [96, .inf] # Descriptor was updated more than 8x per 3 hour expiry period
+        - [12, 13]
+        - [13, 14]
+        - [14, 15]
+        - [15, 16]
+        - [16, 17]
+        - [17, 18] # Descriptors updated every 2 hours
+        - [18, 19]
+        - [19, 20]
+        - [20, 21]
+        - [21, 22]
+        - [22, 23]
+        - [23, 24]
+        - [24, 25]
+        - [25, 26]
+        - [26, 27]
+        - [27, 28]
+        - [28, 29]
+        - [29, 30]
+        - [30, 31]
+        - [31, 32]
+        - [32, 33]
+        - [33, 34]
+        - [34, 35]
+        - [35, 36] # Descriptors updated every hour
+        - [36, 72] # Descriptors updated twice every hour
+        - [72, 96] # Descriptors updated 3x every hour
+        - [96, 108] # Descriptors updated 4x every hour
+        - [108, 144] # Descriptors updated 5x every hour
+        - [144, 180] # Descriptors updated 6x every hour
+        - [180, .inf] # Descriptors updated >6x every hour
     HSDir3StoreRejectRevisionHistogram:
         bins:
-        - [ 0,  1] # Capture each per-expiry period revision separately
+        - [ 0,  1] # Descriptors for new or restarted services
         - [ 1,  2]
         - [ 2,  3]
         - [ 3,  4]
@@ -1634,17 +1701,39 @@ counters:
         - [ 9, 10]
         - [10, 11]
         - [11, 12]
-        - [12, 24] # Descriptor was updated 1x-2x per 3 hour expiry period
-        - [24, 36]
-        - [36, 48]
-        - [48, 60]
-        - [60, 72]
-        - [72, 84]
-        - [84, 96] # Descriptor was updated 7x-8x per 3 hour expiry period
-        - [96, .inf] # Descriptor was updated more than 8x per 3 hour expiry period
+        - [12, 13]
+        - [13, 14]
+        - [14, 15]
+        - [15, 16]
+        - [16, 17]
+        - [17, 18] # Descriptors updated every 2 hours
+        - [18, 19]
+        - [19, 20]
+        - [20, 21]
+        - [21, 22]
+        - [22, 23]
+        - [23, 24]
+        - [24, 25]
+        - [25, 26]
+        - [26, 27]
+        - [27, 28]
+        - [28, 29]
+        - [29, 30]
+        - [30, 31]
+        - [31, 32]
+        - [32, 33]
+        - [33, 34]
+        - [34, 35]
+        - [35, 36] # Descriptors updated every hour
+        - [36, 72] # Descriptors updated twice every hour
+        - [72, 96] # Descriptors updated 3x every hour
+        - [96, 108] # Descriptors updated 4x every hour
+        - [108, 144] # Descriptors updated 5x every hour
+        - [144, 180] # Descriptors updated 6x every hour
+        - [180, .inf] # Descriptors updated >6x every hour
     HSDir3StoreAddNewRevisionHistogram:
         bins:
-        - [ 0,  1] # Capture each per-expiry period revision separately
+        - [ 0,  1] # Descriptors for new or restarted services
         - [ 1,  2]
         - [ 2,  3]
         - [ 3,  4]
@@ -1656,14 +1745,36 @@ counters:
         - [ 9, 10]
         - [10, 11]
         - [11, 12]
-        - [12, 24] # Descriptor was updated 1x-2x per 3 hour expiry period
-        - [24, 36]
-        - [36, 48]
-        - [48, 60]
-        - [60, 72]
-        - [72, 84]
-        - [84, 96] # Descriptor was updated 7x-8x per 3 hour expiry period
-        - [96, .inf] # Descriptor was updated more than 8x per 3 hour expiry period
+        - [12, 13]
+        - [13, 14]
+        - [14, 15]
+        - [15, 16]
+        - [16, 17]
+        - [17, 18] # Descriptors updated every 2 hours
+        - [18, 19]
+        - [19, 20]
+        - [20, 21]
+        - [21, 22]
+        - [22, 23]
+        - [23, 24]
+        - [24, 25]
+        - [25, 26]
+        - [26, 27]
+        - [27, 28]
+        - [28, 29]
+        - [29, 30]
+        - [30, 31]
+        - [31, 32]
+        - [32, 33]
+        - [33, 34]
+        - [34, 35]
+        - [35, 36] # Descriptors updated every hour
+        - [36, 72] # Descriptors updated twice every hour
+        - [72, 96] # Descriptors updated 3x every hour
+        - [96, 108] # Descriptors updated 4x every hour
+        - [108, 144] # Descriptors updated 5x every hour
+        - [144, 180] # Descriptors updated 6x every hour
+        - [180, .inf] # Descriptors updated >6x every hour
     # HSv2 allows a maximum of 10 intro points
     # Data Collectors warn outside the [0, 10] range
     HSDir2StoreAddIntroPointHistogram:
