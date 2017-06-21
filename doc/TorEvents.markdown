@@ -322,9 +322,9 @@ Service descriptor versions 2 and 3 are supported
 (see HiddenServiceVersionNumber). Version 3 has not been tested, because a
 full service implementation is not available.
 
-This event does NOT include the onion address: instead, it includes the
-alternate identifiers DescriptorId (v2) or BlindedEd25519PublicKey (v3). The
-number of identifiers per service differs between versions 2 and 3.
+Version 3 service descriptors encrypt the onion address. As a subsitute, the
+event includes the BlindedEd25519PublicKey identifier, which changes every day,
+and has an overlap period.
 
 This event has tagged fields: order may vary, fields may be optional. Optional
 fields in current versions may be removed in future versions.
@@ -349,6 +349,7 @@ Optional in v2, Not Available in v3:
 * SupportedProtocolBitfield
 * RequiresClientAuthFlag
 * IntroPointCount (missing if using client auth, or parsing failed)
+* IntroPointFingerprintList (missing if using client auth, or parsing failed)
 
 Optional in v3, Not Available in v2:
 * BlindedEd25519PublicKeyBase64String
@@ -552,7 +553,10 @@ A string containing the base-64 encoded blinded ed25519 public key, a unique
 daily identifier for a service's descriptors (v3 only).
 
 There is one BlindedEd25519PublicKey per service address, per day
-(or hsdir-interval consensus parameter).
+(or hsdir-interval consensus parameter). There is a 12-hour overlap period per
+day where services upload to two sets of HSDirs: this overlap period starts
+when the service downloads the first consensus containin a new SRV. The serice
+stops publishing with that SRV ~36 hours later.
 
 For details, see:
 https://gitweb.torproject.org/torspec.git/tree/proposals/224-rend-spec-ng.txt#n927
