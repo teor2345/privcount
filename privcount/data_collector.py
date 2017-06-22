@@ -909,7 +909,7 @@ class Aggregator(ReconnectingClientFactory):
                 return False
 
         # these events have tagged fields: fields may be optional
-        elif event_code == 'PRIVCOUNT_HSDIR_CACHE_STORED':
+        elif event_code == 'PRIVCOUNT_HSDIR_CACHE_STORE':
             fields = parse_tagged_event(items)
             # malformed: handle by warning and ignoring
             if len(items) > 0 and len(fields) == 0:
@@ -1639,7 +1639,7 @@ class Aggregator(ReconnectingClientFactory):
     @staticmethod
     def are_hsdir_stored_fields_valid(fields, event_desc):
         '''
-        Check if the PRIVCOUNT_HSDIR_CACHE_STORED fields are valid.
+        Check if the PRIVCOUNT_HSDIR_CACHE_STORE fields are valid.
         Returns True if they are all valid, False if one or more are not.
         Logs a warning using event_desc for the first field that is invalid.
         '''
@@ -1818,7 +1818,7 @@ class Aggregator(ReconnectingClientFactory):
 
     def _handle_hsdir_stored_event(self, fields):
         '''
-        Process a PRIVCOUNT_HSDIR_CACHE_STORED event
+        Process a PRIVCOUNT_HSDIR_CACHE_STORE event
         This is a tagged event: fields is a dictionary of Key=Value pairs.
         Fields may be optional, order is unimportant.
         Fields used:
@@ -1836,7 +1836,7 @@ class Aggregator(ReconnectingClientFactory):
         Never returns False: we prefer to warn about malformed events and
         continue processing.
         '''
-        event_desc = "in PRIVCOUNT_HSDIR_CACHE_STORED event"
+        event_desc = "in PRIVCOUNT_HSDIR_CACHE_STORE event"
 
         if not Aggregator.are_hsdir_stored_fields_valid(fields, event_desc):
             # handle the event by warning (in the validator) and ignoring it
