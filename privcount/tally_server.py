@@ -187,6 +187,12 @@ class TallyServer(ServerFactory, PrivCountServer):
                 ts_conf['secret_handshake'],
                 create=True)
 
+            ts_conf.setdefault('circuit_sample_rate', 1.0)
+            ts_conf['circuit_sample_rate'] = \
+                float(ts_conf['circuit_sample_rate'])
+            assert ts_conf['circuit_sample_rate'] >= 0.0
+            assert ts_conf['circuit_sample_rate'] <= 1.0
+
             # the counter bin file
             if 'counters' in ts_conf:
                 ts_conf['counters'] = normalise_path(ts_conf['counters'])
@@ -364,12 +370,6 @@ class TallyServer(ServerFactory, PrivCountServer):
 
             ts_conf['sigma_decrease_tolerance'] = \
                 self.get_valid_sigma_decrease_tolerance(ts_conf)
-
-            ts_conf.setdefault('circuit_sample_rate', 1.0)
-            ts_conf['circuit_sample_rate'] = \
-                float(ts_conf['circuit_sample_rate'])
-            assert ts_conf['circuit_sample_rate'] >= 0.0
-            assert ts_conf['circuit_sample_rate'] <= 1.0
 
             assert ts_conf['listen_port'] > 0
             assert ts_conf['sk_threshold'] > 0
