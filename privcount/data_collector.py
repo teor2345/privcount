@@ -1,5 +1,6 @@
 # See LICENSE for licensing information
 
+import bisect
 import ipaddress
 import logging
 import math
@@ -1184,12 +1185,83 @@ class Aggregator(ReconnectingClientFactory):
                                             totalbw, writebw, readbw,
                                             ratio, lifetime)
 
+        # Test data
+        # curl http://s3.amazonaws.com/alexa-static/top-1m.csv.zip > top-1m.csv.zip
+        # unzip -c -q top-1m.csv.zip | head -10 | cut -f2 -d,
+        HARD_CODED_ALEXA_TOP_10_LIST = [
+                                        'google.com',
+                                        'youtube.com',
+                                        'facebook.com',
+                                        'baidu.com',
+                                        'wikipedia.org',
+                                        'yahoo.com',
+                                        'google.co.in',
+                                        'reddit.com',
+                                        'qq.com',
+                                        'taobao.com',
+        ]
+
+        # TODO: strip leading and trailing periods from domain names and host names
+
+        # For large lists, set matching uses a hash table, so it's more
+        # efficient, even if it does double the RAM requirement from 15 MB to
+        # 30 MB for the Alexa 1 million
+        # (It's unlikely we could get rid of all the references to the domain
+        # strings after reversing them, anyway.)
+        # TODO: it's not efficient to create the set and multiple lists for every stream!
+        domain_set = set(HARD_CODED_ALEXA_TOP_10_LIST)
+        # we want to do an efficient suffix match, but a binary search requires a prefix match, so we have to reverse all the strings
+        reversed_domain_suffix_list = ["".join(reversed(domain)) + "." for domain in HARD_CODED_ALEXA_TOP_10_LIST]
+        sorted_reversed_domain_suffix_list = sorted(reversed_domain_suffix_list)
+
         # now collect statistics on list matches for each hostname
         if host_ip_version == "Hostname":
-            # exact match: == d
-            # domain and any subdomains: == d or endswith("." + d)
-            # first domain on circuit: "" / stream_circ
-            pass
+
+            # check for an exact match
+            # this is O(N), but obviously correct
+            # TODO: comment out after testing
+            assert (remote_host in domain_set) == any([remote_host == domain for domain in HARD_CODED_ALEXA_TOP_10_LIST])
+            # this is O(1), because set uses a hash table internally
+            if remote_host in domain_set:
+                exact_match = "DomainExactMatch"
+                # an exact match implies a suffix match
+                suffix_match = "DomainSuffixMatch"
+            else:
+                exact_match = "DomainNoExactMatch"
+                # check for a suffix match
+                # this is O(log(N)) because it's a binary search followed by a string prefix match
+                # it works even if there are multiple matches, because shorter strings sort before longer strings
+                # TODO: validate list suffix uniqueness at tally server
+                reversed_remote_host = "".join(reversed(remote_host))
+                candidate_idx = bisect.bisect_left(reversed_remote_host, sorted_reversed_domain_suffix_list)
+                candidate_reversed_domain = sorted_reversed_domain_suffix_list[candidate_idx]
+                # this is O(N), but obviously correct
+                # TODO: comment out after testing
+                assert (reversed_remote_host.startswith(candidate_reversed_domain + ".")) == any([remote_host.endswith("." + domain) for domain in HARD_CODED_ALEXA_TOP_10_LIST])
+                # Adding the period here means that we only modify the string when we know it's not an exact match
+                if reversed_remote_host.startswith(candidate_reversed_domain + "."):
+                    suffix_match = "DomainSuffixMatch"
+                else:
+                    suffix_match = "DomainNoSuffixMatch"
+
+            # collect exact match & first / subsequent domain on circuit
+            self._increment_stream_end_counters(exact_match,
+                                                totalbw, writebw, readbw,
+                                                ratio, lifetime)
+
+            self._increment_stream_end_counters(exact_match + stream_circ,
+                                                totalbw, writebw, readbw,
+                                                ratio, lifetime)
+
+            # collect suffix match & first / subsequent domain on circuit
+            self._increment_stream_end_counters(suffix_match,
+                                                totalbw, writebw, readbw,
+                                                ratio, lifetime)
+
+            self._increment_stream_end_counters(suffix_match + stream_circ,
+                                                totalbw, writebw, readbw,
+                                                ratio, lifetime)
+
 
         return True
 
