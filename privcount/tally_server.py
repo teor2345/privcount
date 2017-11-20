@@ -23,7 +23,7 @@ from privcount.counter import SecureCounters, counter_modulus, min_blinded_count
 from privcount.crypto import generate_keypair, generate_cert
 from privcount.log import log_error, format_elapsed_time_since, format_elapsed_time_wait, format_delay_time_until, format_interval_time_between, format_last_event_time_since, errorCallback, summarise_string
 from privcount.match import exact_match_prepare_collection, suffix_match_prepare_collection
-from privcount.node import PrivCountServer, continue_collecting, log_tally_server_status, EXPECTED_EVENT_INTERVAL_MAX, EXPECTED_CONTROL_ESTABLISH_MAX
+from privcount.node import PrivCountNode, PrivCountServer, continue_collecting, log_tally_server_status, EXPECTED_EVENT_INTERVAL_MAX, EXPECTED_CONTROL_ESTABLISH_MAX
 from privcount.protocol import PrivCountServerProtocol, get_privcount_version
 from privcount.statistics_noise import get_noise_allocation, get_sanity_check_counter, DEFAULT_DUMMY_COUNTER_NAME
 from privcount.traffic_model import TrafficModel, check_traffic_model_config
@@ -1457,6 +1457,12 @@ class CollectionPhase(object):
         if 'counters' in result_context['TallyServer']['Config']:
             result_context['TallyServer']['Config']['counters'] = "(counter bins, no counts)"
         # but we want the noise, because it's not in Tally
+
+        # we don't want the full list of domains
+        # (the DCs summarise their domains before sending back their
+        # start configs, to save bandwidth)
+        # The config has already been deepcopied
+        PrivCountNode.summarise_domain_lists(result_context['TallyServer']['Config'])
 
         return result_context
 
