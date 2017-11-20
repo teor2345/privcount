@@ -375,8 +375,8 @@ class PrivCountClient(PrivCountNode):
             start_config['noise'],
             time(),
             self.config['delay_period'],
-            self.config['always_delay'],
-            self.config['sigma_decrease_tolerance']):
+            always_delay=self.config['always_delay'],
+            tolerance=self.config['sigma_decrease_tolerance']):
             # we can't start the round yet
             return None
 
@@ -448,8 +448,8 @@ class PrivCountClient(PrivCountNode):
             self.collection_start_time,
             end_time,
             self.config['delay_period'],
-            self.config['always_delay'],
-            self.config['sigma_decrease_tolerance'])
+            always_delay=self.config['always_delay'],
+            tolerance=self.config['sigma_decrease_tolerance'])
 
         logging.info("collection phase was stopped")
 
