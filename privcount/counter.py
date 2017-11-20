@@ -1334,9 +1334,9 @@ class CollectionDelay(object):
     DC: checks round_start_permitted() before sending blinding shares
     SK: checks round_start_permitted() before accepting blinding shares
     (round runs)
-    DC: set_stop_result() when round stops and counters are sent
-    SK: set_stop_result() when round stops and blinding shares are sent
-    TS: set_stop_result() when round ends successfully
+    DC: set_delay_for_stop() when round stops and counters are sent
+    SK: set_delay_for_stop() when round stops and blinding shares are sent
+    TS: set_delay_for_stop() when round ends successfully
     (repeat for next round, if TS has continue set in its config)
     '''
 
@@ -1505,7 +1505,7 @@ class CollectionDelay(object):
                              delay_reason)
             return False
 
-    def set_stop_result(
+    def set_delay_for_stop(
             self, round_successful, noise_allocation, start_time, end_time,
             delay_period, always_delay=False,
             tolerance=DEFAULT_SIGMA_DECREASE_TOLERANCE):

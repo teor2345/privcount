@@ -441,7 +441,7 @@ class PrivCountClient(PrivCountNode):
         response['Config']['Time']['Collect'] = actual_collect
 
         # Register the stop with the collection delay
-        self.collection_delay.set_stop_result(
+        self.collection_delay.set_delay_for_stop(
             round_successful,
             # set when the round started
             self.last_noise_config,

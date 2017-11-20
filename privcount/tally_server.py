@@ -1004,7 +1004,7 @@ class TallyServer(ServerFactory, PrivCountServer):
             self.num_completed_collection_phases += 1
             self.collection_phase.write_results(self.config['results'],
                                                 end_time)
-            self.collection_delay.set_stop_result(
+            self.collection_delay.set_delay_for_stop(
                 not self.collection_phase.is_error(),
                 # we can't use config['noise'], because it might have changed
                 # since the start of the round
