@@ -1952,6 +1952,8 @@ class TorControlClientProtocol(LineOnlyReceiver, TorControlProtocol):
             self.sendLine("GETCONF Nickname")
             self.sendLine("GETCONF ORPort")
             self.sendLine("GETCONF DirPort")
+            self.sendLine("GETCONF GeoIPFile")
+            self.sendLine("GETCONF GeoIPv6File")
             self.sendLine("GETINFO version")
             self.sendLine("GETINFO address")
             # Unpatched Tor will break the protocol in response to this:
@@ -2007,6 +2009,26 @@ class TorControlClientProtocol(LineOnlyReceiver, TorControlProtocol):
             elif line == "250 DirPort":
                 logging.info("Connection with {}: no DirPort"
                              .format(transport_info(self.transport)))
+            elif line.startswith("250 GeoIPFile="):
+                _, _, geoip_file = line.partition("GeoIPFile=")
+                self.setDiscoveredValue('set_geoip_file', geoip_file,
+                                        'GeoIPFile')
+            elif line == "250 GeoIPFile":
+                logging.info("Connection with {}: no GeoIPFile"
+                             .format(transport_info(self.transport)))
+                # It has no GeoIPFile, which is different to not knowing if it
+                # has a GeoIPFile or not
+                self.setDiscoveredValue('set_geoip_file', '', 'GeoIPFile')
+            elif line.startswith("250 GeoIPv6File="):
+                _, _, geoipv6_file = line.partition("GeoIPv6File=")
+                self.setDiscoveredValue('set_geoipv6_file', geoipv6_file,
+                                        'GeoIPv6File')
+            elif line == "250 GeoIPv6File":
+                logging.info("Connection with {}: no GeoIPv6File"
+                             .format(transport_info(self.transport)))
+                # It has no GeoIPv6File, which is different to not knowing if it
+                # has a GeoIPv6File or not
+                self.setDiscoveredValue('set_geoipv6_file', '', 'GeoIPv6File')
             # It's just told us its version
             # The control spec assumes that Tor always has a version, so there's no error case
             # This version *might* have a git tag, unlike the version
