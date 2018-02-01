@@ -226,6 +226,42 @@ def is_collection_tag_valid(collection_tag):
     '''
     return type(collection_tag) != dict and collection_tag is not None
 
+def suffix_match_validate_item(suffix_obj, search_string,
+                               origin_list, separator="",
+                               expected_collection_tag=-1,
+                               expect_disjoint=True):
+    '''
+    Search suffix_obj for search_string using separator.
+    If expect_disjoint is True, make sure it yields expected_collection_tag.
+    Otherwise, make sure it yields a collection tag that is not None.
+
+    If the search fails, log a warning using origin_list, and raise an
+    exception.
+    '''
+    try:
+        found_collection_tag = suffix_match(suffix_obj, search_string,
+                                            separator=separator)
+        if expect_disjoint:
+            assert found_collection_tag == expected_collection_tag
+        else:
+            assert found_collection_tag is not None
+    except:
+        logging.warning("Validating suffix {} -> {} found {} ({}):\Origin:\n{}\nTree:\n{}"
+                        .format(search_string,
+                                expected_collection_tag,
+                                found_collection_tag,
+                                "required disjoint" if expect_disjoint else "allowed overlaps",
+                                summarise_list(origin_list, 50),
+                                summarise_list(suffix_obj.keys(), 50)))
+        logging.debug("Validating suffix {} -> {} found {} ({}):\Origin (full):\n{}\nTree (full):\n{}"
+                      .format(search_string,
+                              expected_collection_tag,
+                              found_collection_tag,
+                              "required disjoint" if expect_disjoint else "allowed overlaps",
+                              origin_list,
+                              suffix_obj))
+        raise
+
 def suffix_match_prepare_collection(suffix_collection, separator="",
                                     existing_suffixes=None, collection_tag=-1,
                                     validate=True):
@@ -319,14 +355,11 @@ def suffix_match_prepare_collection(suffix_collection, separator="",
 
         # Now check that each item actually matches the list
         if validate:
-            try:
-                assert suffix_match(suffix_obj, insert_string,
-                                    separator=separator) is not None
-            except:
-                logging.warning("Validating suffix {} failed:\nCollection:\n{}\nTree:\n{}"
-                                .format(insert_string, suffix_collection,
-                                        suffix_obj))
-                raise
+            suffix_match_validate_item(suffix_obj, insert_string,
+                                       suffix_collection,
+                                       separator=separator,
+                                       expected_collection_tag=collection_tag,
+                                       expect_disjoint=False)
 
     if len(longer_suffix_list) > 0:
         duplicates = True
