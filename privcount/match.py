@@ -164,9 +164,8 @@ def exact_match_prepare_collection(exact_collection,
     if len(exact_collection) != len(exact_set):
       dups = [obj for obj in exact_set
               if exact_collection_lower.count(lower_if_hasattr(obj)) > 1]
-      dups_summary = summarise_list(dups, 50)
       logging.warning("Removing {} duplicates within this collection"
-                      .format(dups_summary))
+                      .format(summarise_list(dups)))
     # the encoded json measures transmission size, not RAM size
     logging.info("Exact match prepared {} items ({})"
                  .format(len(exact_set),
@@ -185,9 +184,8 @@ def exact_match_prepare_collection(exact_collection,
         disjoint_exact_set = exact_set.difference(*existing_exacts)
         duplicate_exact_set = exact_set.difference(disjoint_exact_set)
         if len(duplicate_exact_set) > 0:
-            dups_summary = summarise_list(duplicate_exact_set, 50)
             logging.warning("Removing {} duplicates that are also in an earlier collection"
-                            .format(dups_summary))
+                            .format(summarise_list(duplicate_exact_set)))
         existing_exacts.append(disjoint_exact_set)
         return disjoint_exact_set
 
@@ -227,7 +225,7 @@ def is_collection_tag_valid(collection_tag):
     return type(collection_tag) != dict and collection_tag is not None
 
 def suffix_match_validate_item(suffix_obj, search_string,
-                               origin_list, separator="",
+                               original_list, separator="",
                                expected_collection_tag=-1,
                                expect_disjoint=True):
     '''
@@ -235,7 +233,7 @@ def suffix_match_validate_item(suffix_obj, search_string,
     If expect_disjoint is True, make sure it yields expected_collection_tag.
     Otherwise, make sure it yields a collection tag that is not None.
 
-    If the search fails, log a warning using origin_list, and raise an
+    If the search fails, log a warning using original_list, and raise an
     exception.
     '''
     try:
@@ -246,19 +244,19 @@ def suffix_match_validate_item(suffix_obj, search_string,
         else:
             assert found_collection_tag is not None
     except:
-        logging.warning("Validating suffix {} -> {} found {} ({}):\Origin:\n{}\nTree:\n{}"
+        logging.warning("Validating suffix {} -> {} found {} ({}):\nOriginal:\n{}\nTree:\n{}"
                         .format(search_string,
                                 expected_collection_tag,
                                 found_collection_tag,
                                 "required disjoint" if expect_disjoint else "allowed overlaps",
-                                summarise_list(origin_list, 50),
-                                summarise_list(suffix_obj.keys(), 50)))
-        logging.debug("Validating suffix {} -> {} found {} ({}):\Origin (full):\n{}\nTree (full):\n{}"
+                                summarise_list(original_list),
+                                summarise_list(suffix_obj.keys())))
+        logging.debug("Validating suffix {} -> {} found {} ({}):\nOriginal (full):\n{}\nTree (full):\n{}"
                       .format(search_string,
                               expected_collection_tag,
                               found_collection_tag,
                               "required disjoint" if expect_disjoint else "allowed overlaps",
-                              origin_list,
+                              original_list,
                               suffix_obj))
         raise
 
@@ -340,8 +338,7 @@ def suffix_match_prepare_collection(suffix_collection, separator="",
         if (not has_longer_suffix and
             not is_collection_tag_valid(suffix_node) and len(suffix_node) > 0):
             duplicates = True
-            # sort names alphabetically, so the logs are in a sensible order
-            child_summary = summarise_list(suffix_node.keys(), 50)
+            child_summary = summarise_list(suffix_node.keys())
             child_all = " ".join(suffix_node.keys())
             logging.warning("Adding shorter suffix {} for collection {}, pruning existing children {}"
                             .format(insert_string, collection_tag, child_summary))
@@ -363,8 +360,7 @@ def suffix_match_prepare_collection(suffix_collection, separator="",
 
     if len(longer_suffix_list) > 0:
         duplicates = True
-        # sort names alphabetically, so the logs are in a sensible order
-        suffix_summary = summarise_list(longer_suffix_list, 50)
+        suffix_summary = summarise_list(longer_suffix_list)
         suffix_all = " ".join(longer_suffix_list)
         logging.warning("Suffix match for {} ignored longer suffixes {}"
                         .format(collection_tag, suffix_summary))
