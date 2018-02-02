@@ -462,7 +462,7 @@ class TallyServer(ServerFactory, PrivCountServer):
         if exacts_key is not None:
             assert len(new_config.get(files_key, [])) == len(new_processed_config[exacts_key])
         if suffixes_key is not None:
-            assert (len(new_config[files_key]) > 0) == (len(new_processed_config[suffixes_key]) > 0)
+            assert (len(new_config.get(files_key, [])) > 0) == (len(new_processed_config[suffixes_key]) > 0)
 
     @staticmethod
     def load_as_prefix_config(old_config,
