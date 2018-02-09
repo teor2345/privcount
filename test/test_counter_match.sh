@@ -85,8 +85,8 @@ for code in "$TEST_DIR"/../privcount/{counter,data_collector}.py; do
                -e "ExitWeb" \
             >> "$OUT_PATH.names.unsorted" || true
         cat "$TEST_DIR/counters.bins.yaml.names" \
-            | grep -e "^HSDir[2-3]" \
-            | grep -v -e "^HSDir[2-3]Circuit" \
+            | grep -e "^HSDir[23]" \
+            | grep -v -e "^HSDir[23].*Circuit" \
             >> "$OUT_PATH.names.unsorted" || true
         cat "$TEST_DIR/counters.bins.yaml.names" \
             | grep -e "Entry.*Connection" \
