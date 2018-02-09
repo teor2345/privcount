@@ -4634,9 +4634,6 @@ counters:
     HSDir3MultiHopClientCircuitInboundCellHistogram:
         estimated_value: 0.0
         sensitivity: 0.0
-    EntryCircuitInboundCellHistogram:
-        estimated_value: 0.0
-        sensitivity: 0.0
     Rend2CircuitOutboundCellHistogram:
         estimated_value: 0.0
         sensitivity: 0.0
@@ -5073,8 +5070,5 @@ counters:
         estimated_value: 0.0
         sensitivity: 0.0
     HSDir3MultiHopClientCircuitOutboundCellHistogram:
-        estimated_value: 0.0
-        sensitivity: 0.0
-    EntryCircuitOutboundCellHistogram:
         estimated_value: 0.0
         sensitivity: 0.0

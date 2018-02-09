@@ -2058,7 +2058,6 @@ TODO: merge and integrate with existing counter tests
 - Rend3MultiHopClientCircuitInboundCellHistogram
 - Intro3MultiHopClientCircuitInboundCellHistogram
 - HSDir3MultiHopClientCircuitInboundCellHistogram
-- EntryCircuitInboundCellHistogram
 - Rend2CircuitOutboundCellHistogram
 - Intro2CircuitOutboundCellHistogram
 - HSDir2CircuitOutboundCellHistogram
@@ -2205,4 +2204,3 @@ TODO: merge and integrate with existing counter tests
 - Rend3MultiHopClientCircuitOutboundCellHistogram
 - Intro3MultiHopClientCircuitOutboundCellHistogram
 - HSDir3MultiHopClientCircuitOutboundCellHistogram
-- EntryCircuitOutboundCellHistogram

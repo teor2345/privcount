@@ -3109,8 +3109,6 @@ counters:
         sigma: 0.0
     HSDir3MultiHopClientCircuitInboundCellHistogram:
         sigma: 0.0
-    EntryCircuitInboundCellHistogram:
-        sigma: 0.0
     Rend2CircuitOutboundCellHistogram:
         sigma: 0.0
     Intro2CircuitOutboundCellHistogram:
@@ -3402,6 +3400,4 @@ counters:
     Intro3MultiHopClientCircuitOutboundCellHistogram:
         sigma: 0.0
     HSDir3MultiHopClientCircuitOutboundCellHistogram:
-        sigma: 0.0
-    EntryCircuitOutboundCellHistogram:
         sigma: 0.0
