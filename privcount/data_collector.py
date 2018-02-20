@@ -4020,7 +4020,8 @@ class Aggregator(ReconnectingClientFactory):
                                                       reason_str,
                                                       was_added,
                                                       has_existing,
-                                                      has_client_auth,
+                                                      # Only use shared counters
+                                                      None,
                                                       event_desc,
                                                       bin=bin,
                                                       inc=inc,
@@ -4177,47 +4178,48 @@ class Aggregator(ReconnectingClientFactory):
             assert hs_version == 2
             # we don't bother collecting detailed rejection subcategories
             # to add rejection counters, their names to the list in counter.py
-            self._increment_hsdir_stored_counters("IntroPointHistogram",
-                                                  hs_version,
-                                                  reason_str,
-                                                  was_added,
-                                                  has_existing,
-                                                  has_client_auth,
-                                                  event_desc,
-                                                  bin=intro_count,
-                                                  inc=1,
-                                                  log_missing_counters=False)
+            self._increment_hsdir_stored_version_counters("HSDir2",
+                                                          "IntroPointHistogram",
+                                                          reason_str,
+                                                          was_added,
+                                                          has_existing,
+                                                          has_client_auth,
+                                                          event_desc,
+                                                          bin=bin,
+                                                          inc=inc,
+                                                          log_missing_counters=log_missing_counters)
+
         if create_time is not None:
             # we checked in are_hsdir_stored_fields_valid()
             assert hs_version == 2
             # create_time is truncated to the nearest hour
             delay_time = event_ts - create_time
-            self._increment_hsdir_stored_counters("UploadDelayTime",
-                                                  hs_version,
-                                                  reason_str,
-                                                  was_added,
-                                                  has_existing,
-                                                  has_client_auth,
-                                                  event_desc,
-                                                  bin=delay_time,
-                                                  inc=1,
-                                                  log_missing_counters=False)
+            self._increment_hsdir_stored_version_counters("HSDir2",
+                                                          "UploadDelayTime",
+                                                          reason_str,
+                                                          was_added,
+                                                          has_existing,
+                                                          has_client_auth,
+                                                          event_desc,
+                                                          bin=bin,
+                                                          inc=inc,
+                                                          log_missing_counters=log_missing_counters)
 
         # Increment counters for v3 optional fields
 
         if revision_num is not None:
             # we checked in are_hsdir_stored_fields_valid()
             assert hs_version == 3
-            self._increment_hsdir_stored_counters("RevisionHistogram",
-                                                  hs_version,
-                                                  reason_str,
-                                                  was_added,
-                                                  has_existing,
-                                                  has_client_auth,
-                                                  event_desc,
-                                                  bin=revision_num,
-                                                  inc=1,
-                                                  log_missing_counters=False)
+            self._increment_hsdir_stored_version_counters("HSDir3",
+                                                          "RevisionHistogram",
+                                                          reason_str,
+                                                          was_added,
+                                                          has_existing,
+                                                          has_client_auth,
+                                                          event_desc,
+                                                          bin=bin,
+                                                          inc=inc,
+                                                          log_missing_counters=log_missing_counters)
         # we processed and handled the event
         return True
 
