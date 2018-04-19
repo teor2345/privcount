@@ -99,6 +99,12 @@ def add_plot_args(parser):
         # Default to a 95.4% confidence interval, or 2 standard deviations
         default="2")
 
+    parser.add_argument('-z', '--zero-bound',
+        help="""Assume that values and confidence intervals have a minimum
+                value of zero.""",
+        action="store_true",
+        dest="bound_zero")
+
     # Output format arguments
 
     parser.add_argument('-f', '--format',
@@ -129,6 +135,8 @@ def add_plot_args(parser):
         dest="skip_text")
 
 MAX_LABEL_LEN = 15
+# If we had 100% of the network, we would see 10**15 bytes every 24 hours
+MAX_GRAPH_VALUE = 10.0**20
 
 def import_plotting():
     global matplotlib
@@ -233,8 +241,6 @@ def run_plot(args):
                 sigma = float(sigmas[name]['sigma'])
                 # use the supplied confidence interval for the noise
                 error = int(round(float(args.noise_stddev) * sqrt(3) * sigma))
-                # we don't expect any noise larger than 10**15
-                error = min(error, 1000000000000000)
                 # axis.bar(yerr=) expects a 2xN array-like object
                 plot_info[name]['errors'].append([[],[]])
             else:
@@ -284,9 +290,25 @@ def run_plot(args):
             label_index = 0
             for (left, right, val) in histograms[name]['bins']:
                 if error is not None:
+                    # calculate the error bounds
+                    errlow = val - error
+                    errhigh = val + error
+                    # always bound above
+                    # we don't expect any noise or values larger than MAX_GRAPH_VALUE
+                    errlow = min(errlow, MAX_GRAPH_VALUE)
+                    errhigh = min(errhigh, MAX_GRAPH_VALUE)
+                    # conditionally bound below
+                    if args.bound_zero:
+                        errlow = max(errlow, 0.0)
+                        errhigh = max(errhigh, 0.0)
+                # now bound the value
+                val = min(val, MAX_GRAPH_VALUE)
+                if args.bound_zero:
+                    val = max(val, 0.0)
+                if error is not None:
                     # The +/- errors go in separate arrays
-                    plot_info[name]['errors'][-1][0].append(error)
-                    plot_info[name]['errors'][-1][1].append(error)
+                    plot_info[name]['errors'][-1][0].append(val - errlow)
+                    plot_info[name]['errors'][-1][1].append(errhigh - val)
                 # log the raw error bounds, and note when the result is useful
                 status = []
                 if fout_txt is not None:
