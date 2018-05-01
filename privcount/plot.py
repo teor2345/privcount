@@ -23,7 +23,8 @@ Usage:
 
 MAX_LABEL_LEN = 15
 # If we had 100% of the network, we would see 10**15 bytes every 24 hours
-MAX_GRAPH_VALUE = 10**20
+# Our counters aren't limited to 2**64, but the graphs might not like it
+MAX_VALUE = 10**18
 LINEFORMATS="k,r,b,g,c,m,y"
 
 class PlotDataAction(argparse.Action):
@@ -109,6 +110,39 @@ def add_plot_args(parser):
         action="store_true",
         dest="bound_zero")
 
+    # Ignoring Insignificant Values
+
+    parser.add_argument('-n', '--ignore-noisy',
+        help="""Ignore results that are likely dominated by noise.
+                Bins with noise greater than or equal to 100%% of the bin
+                value are removed from the output.
+                Counters with no bins are removed from the output.""",
+        action="store_true",
+        dest="ignore_noisy")
+
+    parser.add_argument('-i', '--ignore-zero',
+        help="""Ignore results that are likely to be zero.
+                Bins where the lowest bound of the confidence interval is
+                zero or negative are removed from the output.
+                Counters with no bins are removed from the output.""",
+        action="store_true",
+        dest="ignore_zero")
+
+    # Bin Sorting
+
+    parser.add_argument('-s', '--sort',
+        help="""Sort bins by FIELD in each counter.
+                FIELD can be 'label' or 'value'.""",
+        metavar="FIELD",
+        action="store",
+        dest="sort_field",
+        default=None)
+
+    parser.add_argument('-r', '--reverse',
+        help="""Reverse the order of the bins in each counter.""",
+        action="store_true",
+        dest="sort_reverse")
+
     # Bin Labels
 
     parser.add_argument('-b', '--bin-labels',
@@ -116,7 +150,8 @@ def add_plot_args(parser):
                 LABELS can be 'range' for bin range, 'file' for the name of
                 the CountList file for the bin, 'content' for the content of
                 the CountList for the bin, or a path to a file containing a
-                list of newline-separated bin labels.""",
+                list of newline-separated custom bin labels. Custom bin labels
+                only work if each counter has the same number of bins.""",
         metavar="LABELS",
         action="store",
         dest="bin_label_source",
@@ -150,6 +185,37 @@ def add_plot_args(parser):
         help="""Do not output a text file containing the results.""",
         action="store_true",
         dest="skip_text")
+
+def run_plot(args):
+    import_plotting()
+
+    # load the input files
+    inputs = load_input_data(get_experiments(args))
+
+    # extract the counter data
+    counters = collect_counters(inputs)
+
+    # calculate some additional values
+    calculate_bound_values(counters, args.bound_zero)
+    calculate_error_values(counters, inputs, args.bound_zero, args.noise_stddev)
+    calculate_bin_reliability(counters)
+
+    # extract bin labels
+    collect_bin_labels(counters, inputs, args.bin_label_source)
+
+    # create the output file prefix
+    output_prefix = get_output_prefix(args)
+
+    # output the text file
+    if not args.skip_text:
+        text_output_name = "{}privcount.results.txt".format(output_prefix)
+        output_text_file(text_output_name, counters, args.bound_zero)
+
+    # output the PDF file
+    if not args.skip_pdf:
+        pdf_output_name = "{}privcount.results.pdf".format(output_prefix)
+        plot_info = get_plot_info(counters, get_lineformats(args.lineformats))
+        plot_pdf(pdf_output_name, plot_info)
 
 def import_plotting():
     global matplotlib
@@ -198,28 +264,26 @@ def import_plotting():
     try: pylab.rcParams.update({'legend.ncol':1.0})
     except: pass
 
-def get_experiments(args):
+def load_input_data(experiments):
     '''
-    Return the list of experiments from args.
-    Throws an exception if the list of experiments is invalid.
+    Load each input file in experiments, and return an array of inputs.
     '''
-    experiments = args.experiments + args.data_tallies + args.data_outcome
-    if len(experiments) == 0:
-        raise ValueError("You must provide at least one input file using --outcome. For more details, use --help.")
-    return experiments
+    # load all the input file data
+    inputs = []
+    for (path, experiment_label) in experiments:
+        logging.info("Loading results for '{}' from input file '{}'"
+                     .format(experiment_label, path))
+        (histograms, sigmas, bin_labels) = load_input_file(path)
+        input_file = {
+            'path' : path,
+            'experiment_label' : experiment_label,
+            'histograms' : histograms,
+            'sigmas' : sigmas,
+            'bin_labels' : bin_labels,
+        }
+        inputs.append(input_file)
 
-def get_lineformats(args):
-    '''
-    Return a cycle of lineformats from args.
-    '''
-    lflist = args.lineformats.strip().split(",")
-    return cycle(lflist)
-
-def get_prefix(args):
-    '''
-    Return the prefix from args.
-    '''
-    return args.prefix + '.' if args.prefix is not None else ''
+    return inputs
 
 def load_input_file(path):
     '''
@@ -243,7 +307,135 @@ def load_input_file(path):
             labels = data['Context']['TallyServer']['Config']
         else: # this is a tallies file that has no labels
             labels = {}
+
     return (histograms, sigmas, labels)
+
+def get_experiments(args):
+    '''
+    Return the list of experiments from args.
+    Throws an exception if the list of experiments is invalid.
+    '''
+    experiments = args.experiments + args.data_tallies + args.data_outcome
+    if len(experiments) == 0:
+        raise ValueError("You must provide at least one input file using --outcome. For more details, use --help.")
+    return experiments
+
+def collect_counters(inputs):
+    '''
+    Find all the counters in inputs, and return them in an array.
+    '''
+    # collect all the counters from all input files
+    counters = []
+    for input_file in inputs:
+        histograms = input_file['histograms']
+
+        # go through all the counters
+        for counter_name in sorted(histograms.keys()):
+            counter = {
+                'experiment_label' : input_file['experiment_label'],
+                'counter_name' : counter_name,
+                'bins' : [],
+            }
+
+            # go through all the bins
+            for (left, right, value) in histograms[counter_name]['bins']:
+                bin = {
+                    'left' : left,
+                    'right' : right,
+                    'value' : value,
+                }
+                counter['bins'].append(bin)
+
+            counters.append(counter)
+
+    return counters
+
+def calculate_bound_values(counters, bound_zero):
+    '''
+    Calculated a bounded value for every bin in counter, and add it to that
+    counter's dict.
+
+    If bound_zero is True, bound to zero as well as MAX_VALUE.
+    '''
+    # go through all the counters
+    for counter in counters:
+
+        # go through all the bins
+        for bin in counter['bins']:
+            value = bin['value']
+            # now bound the value
+            bound_value = min(value, MAX_VALUE)
+            if bound_zero:
+                bound_value = max(bound_value, 0)
+            bin['bound_value'] = bound_value
+
+def calculate_error_values(counters, inputs, bound_zero, noise_stddev):
+    '''
+    Calculate error differences for every counter using the sigmas in
+    inputs, and noise_stddev.
+    Calculate error values, error percentages, and bounded error values for
+    every bin in every counter. Add these values to their respective dicts.
+
+    If bound_zero is True, bound to zero as well as MAX_VALUE.
+    '''
+    sigmas = inputs['sigmas']
+
+    # go through all the counters
+    for counter in counters:
+
+        # calculate the noise for the counter
+        sigma = get_sigma(counter['name'], sigmas)
+        if (sigma is not None and float(noise_stddev) > 0.0):
+            # use the supplied confidence interval for the noise
+            counter['error_difference'] = int(round(sigma_to_ci_amount(
+                                                        noise_stddev, sigma)))
+            # describe the noise on the experiment label
+            counter['experiment_label_sigma'] = "{} ({} sigma = {:.2f}% CI)"
+                                                    .format(counter['experiment_label'],
+                                                            noise_stddev,
+                                                            100.0*stddev_to_ci_fraction(noise_stddev))
+
+            # go through all the bins
+            for bin in counter['bins']:
+
+                # calculate error percentage
+                # avoid division by zero
+                if abs(bin['value']) != 0:
+                    bin['error_proportion'] = float(counter['error_difference']) / abs(bin['value'])
+                else:
+                    bin['error_proportion'] = float('inf')
+
+                # calculate the error bounds
+                bin['error_value_low'] = bin['value'] - counter['error_difference']
+                bin['error_value_high'] = bin['value'] + counter['error_difference']
+
+                # always bound the value above
+                # we don't expect any noise or values larger than MAX_VALUE
+                bound_error_value_low = min(bin['error_value_low'], MAX_VALUE)
+                bound_error_value_high = min(bin['error_value_high'], MAX_VALUE)
+
+                # conditionally bound below
+                if args.bound_zero:
+                    bound_error_value_low = max(bound_error_value_low, 0)
+                    bound_error_value_high = max(bound_error_value_high, 0)
+
+                bin['bound_error_value_low'] = bound_error_value_low
+                bin['bound_error_value_high'] = bound_error_value_high
+
+                # reconstruct the bound differences from the bound values
+                bin['bound_error_difference_low'] = bin['bound_value'] - bin['bound_error_value_low']
+                bin['bound_error_difference_high'] = bin['bound_error_value_high'] - bin['bound_value']
+
+def get_sigma(counter_name, sigmas):
+    '''
+    Return the sigma for counter_name as a float, if it exists and is valid.
+    Otherwise, return None.
+    '''
+    sigma = sigmas[counter_name].get('sigma', 0.0)
+    if float(sigma) > 0.0:
+        return sigma
+    else:
+        return None
 
 def sigma_to_ci_amount(noise_stddev, sigma_value):
     '''
@@ -258,10 +450,129 @@ def stddev_to_ci_fraction(noise_stddev):
     '''
     return math.erf(float(noise_stddev) / sqrt(2.0))
 
-def get_bin_labels(counter, bin_count, bin_label_data, bin_label_source):
+def calculate_bin_reliability(counters):
     '''
-    Return an array of bin labels for counter from bin_label_data, selected
-    using bin_label_source. See args.bin_label_source for details.
+    Calculate various aspects of the reliability of each bin. Add these values
+    to the bin dicts.
+    '''
+    # go through all the counters
+    for counter in counters:
+
+        # go through all the bins
+        for bin in counter['bins']:
+
+            # could the result be zero (or negative), or is it most likely positive?
+            bin['is_possibly_zero'] = (bin.get('error_value_low', bin['value']) <= 0)
+
+            # is the error proprotion too large?
+            bin['is_noisy'] = (bin.get('error_proportion', 0.0) >= 1.0)
+
+            # work out which values were bounded
+            bin['is_value_bounded'] = (bin['value'] != bin['bound_value'])
+            bin['is_error_low_bounded'] = (bin.get('bound_error_difference_low', 0) != bin.get('error_difference', 0))
+            bin['is_error_high_bounded'] = (bin.get('bound_error_difference_high', 0) != bin.get('error_difference', 0))
+
+            # alternate representation for text output
+            bin['status'] = []
+
+            # is the value mostly noise?
+            if bin['is_noisy']:
+                bin['status'].append('obscured')
+            else:
+                bin['status'].append('visible')
+
+            # does the confidence interval include zero?
+            if bin['is_possibly_zero']
+                bin['status'].append('zero')
+            else:
+                bin['status'].append('positive')
+
+            # work out which values were bounded
+            bin['bounded'] = []
+
+            if bin['is_value_bounded']:
+                bin['bounded'].append('value')
+            if bin['is_error_low_bounded']:
+                bin['bounded'].append('error low')
+            if bin['is_error_high_bounded']:
+                bin['bounded'].append('error high')
+
+def collect_bin_labels(counters, inputs, bin_label_source):
+    '''
+    Collect all the available bin labels out of inputs for each counter, and
+    add them to the bin dicts. Also add the default label based on
+    bin_label_source.
+    '''
+
+    # go through all the counters
+    for counter in counters:
+
+        # get all the different types of bin labels
+        bin_file_labels = get_bin_labels(counter['name'],
+                                         len(counter['bins']),
+                                         inputs,
+                                         'file')
+
+        bin_content_labels = get_bin_labels(counter['name'],
+                                         len(counter['bins']),
+                                         inputs,
+                                         'content')
+        bin_custom_labels = []
+        if bin_label_source not in ['range', 'file', 'content']:
+            bin_custom_labels = get_bin_labels(counter['name'],
+                                               len(counter['bins']),
+                                               inputs,
+                                               bin_label_source)
+
+        bin_preferred_labels = get_bin_labels(counter['name'],
+                                              len(counter['bins']),
+                                              inputs,
+                                              bin_label_source)
+
+        # go through all the bins and label them
+        label_index = 0
+        for bin in counter['bins']:
+            left = bin['left']
+            right = bin['right']
+            bins['range_label'] = "[{:.1f},{:.1f})".format(left, right))
+
+
+            if left == float('-inf'):
+                left = '{}'.format(r'$-\infty$')
+            elif 'Ratio' not in name:
+                left = int(left)
+
+            if right == float('inf'):
+                right = '{}'.format(r'$\infty$')
+            elif not counter['name'].endswith('Ratio'):
+                right = int(right)
+            bins['graph_range_label'] = "[{},{})".format(left, right))
+
+            if len(bins_file_labels) > 0:
+                bins['file_label'] = bin_file_labels[label_index]
+            if len(bin_content_labels) > 0:
+                bins['content_label'] = bin_content_labels[label_index]
+            if len(bin_custom_labels) > 0:
+                bins['custom_label'] = bin_custom_labels[label_index]
+
+            if len(bin_preferred_labels) > 0:
+                bins['label'] = bin_preferred_labels[label_index]
+            else:
+                bins['label'] = bins['range_label']
+
+            if len(bin_preferred_labels) > 0:
+                bins['graph_label'] = bin_preferred_labels[label_index]
+                if len(bins['graph_label']) > MAX_LABEL_LEN:
+                    bins['graph_label'] = bins['graph_label'][0:(MAX_LABEL_LEN-3)] + '...'
+            else:
+                bins['graph_label'] = bins['graph_range_label']
+
+            label_index += 1
+
+def get_bin_labels(counter_name, bin_count, inputs, bin_label_source):
+    '''
+    Return an array of bin labels for counter_name from bin_labels in inputs,
+    selected using bin_label_source. See args.bin_label_source for details.
 
     Returns an empty array to indicate that the default range labels should
     be used.
@@ -271,6 +582,8 @@ def get_bin_labels(counter, bin_count, bin_label_data, bin_label_source):
 
     Asserts if the final number of labels is not equal to bin_count.
     '''
+    bin_label_data = inputs['bin_labels']
+
     labels = []
     if bin_label_source == 'range':
         # we don't want to override the standard range labels
@@ -280,29 +593,29 @@ def get_bin_labels(counter, bin_count, bin_label_data, bin_label_source):
 
         # add the match list bin labels for count lists
         # we don't have custom labels for any other counters
-        if counter.endswith('CountList'):
+        if counter_name.endswith('CountList'):
             # These plot lookups should be kept synchronised with the
             # corresponding TallyServer config options
-            if counter.startswith("ExitDomain"):
+            if counter_name.startswith("ExitDomain"):
                 labels = bin_label_data.get('domain_lists' if c else 'domain_files', [])
-            if "CountryMatch" in counter:
+            if "CountryMatch" in counter_name:
                 labels = bin_label_data.get('country_lists' if c else 'country_files', [])
-            if "ASMatch" in counter:
+            if "ASMatch" in counter_name:
                 # the AS data structure is slightly more complex than the others
                 labels = bin_label_data.get('as_raw_lists' if c else 'as_files', [])
-            if (counter.startswith("HSDir") and
-                "Store" in counter and
-                counter.endswith("ReasonCountList")):
+            if (counter_name.startswith("HSDir") and
+                "Store" in counter_name and
+                counter_name.endswith("ReasonCountList")):
                 labels = bin_label_data.get('hsdir_store_lists' if c else 'hsdir_store_files', [])
-            if (counter.startswith("HSDir") and
-                "Fetch" in counter and
-                counter.endswith("ReasonCountList")):
+            if (counter_name.startswith("HSDir") and
+                "Fetch" in counter_name and
+                counter_name.endswith("ReasonCountList")):
                 labels = bin_label_data.get('hsdir_fetch_lists' if c else 'hsdir_fetch_files', [])
-            if counter.endswith("FailureCircuitReasonCountList"):
+            if counter_name.endswith("FailureCircuitReasonCountList"):
                 labels = bin_label_data.get('circuit_failure_lists' if c else 'circuit_failure_files', [])
-            if (counter.startswith("HSDir") and
-                ("Store" in counter or "Fetch" in counter) and
-                counter.endswith("OnionAddressCountList")):
+            if (counter_name.startswith("HSDir") and
+                ("Store" in counter_name or "Fetch" in counter_name) and
+                counter_name.endswith("OnionAddressCountList")):
                 labels = bin_label_data.get('onion_address_lists' if c else 'onion_address_files', [])
 
         # strip redundant information
@@ -334,180 +647,148 @@ def get_bin_labels(counter, bin_count, bin_label_data, bin_label_source):
 
     return labels
 
-def run_plot(args):
-    import_plotting()
+def get_output_prefix(args):
+    '''
+    Return the prefix from args.
+    '''
+    return args.prefix + '.' if args.prefix is not None else ''
 
-    experiments = get_experiments(args)
-    lfcycle = get_lineformats(args)
-    fprefix = get_prefix(args)
+def output_text_file(text_output_name, counters, bound_zero):
+    '''
+    Output a text file at text_output_name with detailed information about
+    each bin in counters. Include bounding information if bound_zero is true,
+    or MAX_VALUE was reached.
+    '''
+    logging.info("Writing results to text file '{}'".format(text_output_name))
 
-    fout_txt_name = None
-    fout_txt = None
-    if not args.skip_text:
-        fout_txt_name = "{}privcount.results.txt".format(fprefix)
-        fout_txt = open(fout_txt_name, 'w')
+    with open(text_output_name, 'w') as text_output:
 
-    plot_info = {}
-    for (path, label) in experiments:
-        dataset_color = lfcycle.next()
-        dataset_label = label
-        (histograms, sigmas, labels) = load_input_file(path)
+        # go through all the counters
+        previous_experiment_label = None
+        for counter in counters:
 
-        if fout_txt is not None:
-            logging.info("Writing results for '{}' to text file '{}'"
-                         .format(label, fout_txt_name))
-            text_label = label
-            if float(args.noise_stddev) > 0.0:
-                text_label = "{} ({} sigma)".format(label, args.noise_stddev)
-            fout_txt.write("Label: {}\n".format(label))
-        for name in sorted(histograms.keys()):
-            plot_info.setdefault(name, {'datasets':[], 'errors':[], 'dataset_colors':[], 'dataset_labels':[], 'bin_labels':[]})
-            plot_info[name]['dataset_colors'].append(dataset_color)
+            # print the label for each new experiment
+            experiment_label = counter['experiment_label_sigma']
+            if previous_experiment_label != experiment_label:
+                text_output.write("Experiment Label: {}\n".format(experiment_label))
+                previous_experiment_label = experiment_label
 
-            if ('sigma' in sigmas[name] and float(sigmas[name]['sigma']) > 0.0
-                and float(args.noise_stddev) > 0.0):
-                # label the graph with the sttdev and CI
-                dataset_label = "{} ({}$\sigma$ = {:.2f}% CI)".format(label,
-                                                                      args.noise_stddev,
-                                                                      100.0*stddev_to_ci_fraction(args.noise_stddev))
-                # use the supplied confidence interval for the noise
-                error = int(round(sigma_to_ci_amount(args.noise_stddev,
-                                                     sigmas[name]['sigma'])))
-                # axis.bar(yerr=) expects a 2xN array-like object
-                plot_info[name]['errors'].append([[],[]])
+            # adding formatting information to counter is an acceptable abstraction violation
+            if 'error_difference' in counter:
+                # justify up to the error length, plus a few digits and a negative
+                counter['value_justify'] = len(str(counter['error_difference'])) + 3
             else:
-                dataset_label = label
-                error = None
-                plot_info[name]['errors'].append(None)
-
-            plot_info[name]['dataset_labels'].append(dataset_label)
-
-            dataset = []
-            bin_labels = []
-            bin_labels_txt = []
-
-            bin_labels_txt = get_bin_labels(name,
-                                            len(histograms[name]['bins']),
-                                            labels,
-                                            args.bin_label_source)
+                # justify long
+                counter['value_justify'] = 14
 
             # go through all the bins
-            label_index = 0
-            for (left, right, val) in histograms[name]['bins']:
-                raw_val = val
-                # calculate the error bounds
-                if error is not None:
-                    # calculate the error bounds
-                    error_bound_low = val - error
-                    error_bound_high = val + error
-                    # always bound above
-                    # we don't expect any noise or values larger than MAX_GRAPH_VALUE
-                    error_bound_low = min(error_bound_low, MAX_GRAPH_VALUE)
-                    error_bound_high = min(error_bound_high, MAX_GRAPH_VALUE)
-                    # conditionally bound below
-                    if args.bound_zero:
-                        error_bound_low = max(error_bound_low, 0)
-                        error_bound_high = max(error_bound_high, 0)
-                # now bound the value
-                val = min(val, MAX_GRAPH_VALUE)
-                if args.bound_zero:
-                    val = max(val, 0)
-                if error is not None:
-                    error_low = val - error_bound_low
-                    error_high = error_bound_high - val
-                    # The +/- errors go in separate arrays
-                    plot_info[name]['errors'][-1][0].append(error_low)
-                    plot_info[name]['errors'][-1][1].append(error_high)
-                # log the raw error bounds, and note when the result is useful
-                status = []
-                if fout_txt is not None:
-                  if error is not None:
-                      # justify up to the error/val length, plus two digits and a negative
-                      val_just = len(str(error)) + 3
-                  else:
-                      # justify long
-                      val_just = 14
-                  if error is not None:
-                      if abs(raw_val) != 0:
-                          error_perc = error / abs(float(raw_val)) * 100.0
-                      else:
-                          error_perc = 0.0
-                      # is the result too noisy, or is it visible?
-                      if error_perc >= 100.0:
-                          status.append('obscured')
-                      else:
-                          status.append('visible')
-                  # could the result be zero, or is it positive?
-                  if raw_val - (error if error is not None else 0) <= 0:
-                      status.append('zero')
-                  else:
-                      status.append('positive')
-                  error_str = ''
-                  bound_str = ''
-                  bounded = []
-                  if val != raw_val:
-                      bounded.append('value')
-                  if error is not None:
-                      error_str = (" +- {:.0f} ({:7.1f}%)"
-                                   .format(error, error_perc))
-                      if error_low != error:
-                          bounded.append('error low')
-                      if error_high != error:
-                          bounded.append('error high')
-                      bound_str = " bound: {} [{}, {}] ({})".format(
-                                        str(val).rjust(val_just),
-                                        str(error_bound_low).rjust(val_just),
-                                        str(error_bound_high).rjust(val_just),
-                                        ', '.join(bounded) if len(bounded) > 0 else 'no change')
-                  else:
-                      bound_str = " bound: {} ({})".format(
-                                        val,
-                                        ', '.join(bounded) if len(bounded) > 0 else 'no change')
-                  if len(bin_labels_txt) > label_index:
-                      label_str = bin_labels_txt[label_index]
-                      label_str = " '{}'".format(label_str)
-                  else:
-                      label_str = ''
-                  bin_txt = ("{} [{:5.1f},{:5.1f}){} = {}{} ({}){}\n"
-                             .format(name, left, right, label_str,
-                                     str(raw_val).rjust(val_just),
-                                     error_str,
-                                     ", ".join([s.rjust(8) for s in status]),
-                                     bound_str))
-                  fout_txt.write(bin_txt)
-                # format the graph output
-                if right == float('inf'):
-                    right = '{}'.format(r'$\infty$')
-                elif 'Ratio' not in name:
-                    right = int(right)
-                if left == float('-inf'):
-                    left = '{}'.format(r'$-\infty$')
-                elif 'Ratio' not in name:
-                    left = int(left)
-                bin_labels.append("[{},{})".format(left, right))
-                dataset.append(val)
-                label_index += 1
-            if len(bin_labels_txt) > 0:
-                assert len(bin_labels_txt) == len(bin_labels)
-                bin_labels = [bin_label[0:(MAX_LABEL_LEN-3)] + '...' if len(bin_label) > MAX_LABEL_LEN else bin_label for bin_label in bin_labels_txt]
-            plot_info[name]['datasets'].append(dataset)
+            # log the raw error bounds, and note when the result is useful
+            for bin in counter['bins']:
 
-            if len(plot_info[name]['bin_labels']) == 0:
-                plot_info[name]['bin_labels'] = bin_labels
-    if fout_txt is not None:
-        fout_txt.close()
+                if 'error_proportion' in bin:
+                    # assume all the other fields are present in counter and bin
+                    error_str = (" +- {:.0f} ({:7.1f}%)"
+                                 .format(counter['error_difference'],
+                                         bin['error_proportion']*100.0))
+                    bound_str = " bound: {} [{}, {}] ({})".format(
+                                      str(bin['bound_value']).rjust(counter['value_justify']),
+                                      str(bin['bound_error_value_low']).rjust(counter['value_justify']),
+                                      str(bin['bound_error_value_high']).rjust(counter['value_justify']),
+                                      ', '.join(bin['bounded']) if len(bin['bounded']) > 0 else 'no change')
+                else:
+                    error_str = ''
+                    bound_str = " bound: {} ({})".format(
+                                      str(bin['bound_value']).rjust(counter['value_justify']),
+                                      ', '.join(bin['bounded']) if len(bin['bounded']) > 0 else 'no change')
 
-    if not args.skip_pdf:
-        plot_pdf(fprefix, plot_info)
+                # only print non-default labels, because we already print the range
+                if bin['label'] != bin['range_label']:
+                    label_str = " '{}'".format(bin['label'])
+                else:
+                    label_str = ''
 
-def plot_pdf(fprefix, plot_info):
+                bin_txt = ("{} [{:8.1f},{:8.1f}){} = {}{} ({}){}\n"
+                           .format(counter['name'],
+                                   bin['left'],
+                                   bin['right'],
+                                   label_str,
+                                   str(bin['value']).rjust(counter['value_justify']),
+                                   error_str,
+                                   ", ".join([s.rjust(8) for s in bin['status']),
+                                   bound_str if bound_zero or len(bin['bounded']) > 0 else ''))
+                text_output.write(bin_txt)
+
+def get_plot_info(counters, line_formats, noise_stddev):
     '''
-    Plot a PDF file containing plot_info, to a PDF file prefixed by fprefix.
+    Returns the data needed to graph counters, using line_formats and
+    noise_stddev.
     '''
-    fout_pdf_name = "{}privcount.results.pdf".format(fprefix)
-    page = PdfPages(fout_pdf_name)
+    plot_info = {}
+
+    # go through all the counters
+    previous_experiment_label = None
+    for counter in counters:
+
+        # change the colour for each new experiment
+        experiment_label = counter['experiment_label']
+        if previous_experiment_label != experiment_label:
+            dataset_color = line_formats.next()
+            previous_experiment_label = experiment_label
+
+        # setup the plot_info for this counter
+        plot_info.setdefault(counter['name'], {'datasets':[], 'errors':[], 'dataset_colors':[], 'dataset_labels':[], 'bin_labels':[]})
+        plot_info[counter['name']]['dataset_colors'].append(dataset_color)
+
+        # work out the graph label
+        if 'experiment_label_sigma' in counter:
+            # label the graph with the sttdev and CI, and a pretty sigma
+            dataset_label = counter['experiment_label_sigma'].replace('sigma', r'$\sigma$')
+        else:
+            dataset_label = counter['experiment_label']
+
+        plot_info[name]['dataset_labels'].append(dataset_label)
+
+        # initialise the error data structure
+        if ('bound_error_difference_low' in bin and
+            'bound_error_difference_high' in bin):
+            # axis.bar(yerr=) expects a 2xN array-like object
+            plot_info[name]['errors'].append([[],[]])
+        else:
+            plot_info[name]['errors'].append(None)
+
+        dataset = []
+
+        # go through all the bins
+        for bin in counter['bins']:
+            dataset.append(bin['bounded_value'])
+
+            # add the error bounds
+            if ('bound_error_difference_low' in bin and
+                'bound_error_difference_high' in bin):
+                # The +/- errors go in separate arrays
+                plot_info[name]['errors'][-1][0].append(bin['bound_error_difference_low'])
+                plot_info[name]['errors'][-1][1].append(bin['bound_error_difference_high'])
+
+            plot_info[name]['bin_labels'].append(bin['graph_label'])
+
+        plot_info[name]['datasets'].append(dataset)
+
+    return plot_info
+
+def get_lineformats(lineformats):
+    '''
+    Return a cycle of lineformats from lineformats.
+    '''
+    lflist = lineformats.strip().split(",")
+    return cycle(lflist)
+
+def plot_pdf(pdf_output_name, plot_info):
+    '''
+    Plot a PDF file containing plot_info, to a PDF file at pdf_output_name.
+    '''
+    page = PdfPages(pdf_output_name)
     logging.info("Writing results to PDF file '{}'"
-                 .format(fout_pdf_name))
+                 .format(pdf_output_name))
 
     for name in sorted(plot_info.keys()):
         dat = plot_info[name]
