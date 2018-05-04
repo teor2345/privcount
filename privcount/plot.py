@@ -117,6 +117,39 @@ def add_plot_args(parser):
         action="store_true",
         dest="bound_zero")
 
+    # Ignoring Insignificant Values
+
+    parser.add_argument('-n', '--ignore-noisy',
+        help="""Ignore results that are likely dominated by noise.
+                Bins with noise greater than or equal to 100%% of the bin
+                value are removed from the output.
+                Counters with no bins are removed from the output.""",
+        action="store_true",
+        dest="ignore_noisy")
+
+    parser.add_argument('-i', '--ignore-zero',
+        help="""Ignore results that are likely to be zero.
+                Bins where the lowest bound of the confidence interval is
+                zero or negative are removed from the output.
+                Counters with no bins are removed from the output.""",
+        action="store_true",
+        dest="ignore_zero")
+
+    # Bin Sorting
+
+    parser.add_argument('-s', '--sort',
+        help="""Sort bins by FIELD in each counter.
+                FIELD can be 'label' or 'value'.""",
+        metavar="FIELD",
+        action="store",
+        dest="sort_field",
+        default=None)
+
+    parser.add_argument('-r', '--reverse',
+        help="""Reverse the order of the bins in each counter.""",
+        action="store_true",
+        dest="sort_reverse")
+
     # Bin Labels
 
     parser.add_argument('-b', '--bin-labels',
