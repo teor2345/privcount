@@ -135,6 +135,21 @@ def add_plot_args(parser):
         action="store_true",
         dest="ignore_zero")
 
+    # Bin Sorting
+
+    parser.add_argument('-s', '--sort',
+        help="""Sort bins by FIELD in each counter.
+                FIELD can be 'label' or 'value'.""",
+        metavar="FIELD",
+        action="store",
+        dest="sort_field",
+        default=None)
+
+    parser.add_argument('-r', '--reverse',
+        help="""Reverse the order of the bins in each counter.""",
+        action="store_true",
+        dest="sort_reverse")
+
     # Bin Labels
 
     parser.add_argument('-b', '--bin-labels',
